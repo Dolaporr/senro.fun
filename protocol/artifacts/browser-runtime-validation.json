@@ -1,0 +1,31 @@
+{
+  "scope": "local-fixture-validation-only",
+  "date": "2026-11-06",
+  "publicChainTransactions": 0,
+  "toolchain": {
+    "rust": "1.99.1",
+    "cargoBuildSbf": "4.5.0",
+    "platformTools": "v1.57"
+  },
+  "tests": {
+    "javascript": 51,
+    "rustUnit": 3,
+    "rustRuntime": 18,
+    "browserWireRuntime": 5
+  },
+  "wireBytes": {
+    "createPolicyAndBuy": 945,
+    "updatePolicyAndBuy": 950
+  },
+  "files": {
+    "guard/src/lib.rs": "f352b2c73dfb542857c67e46b2d78ee51da38ec15a4a7718eb0396f91278d236",
+    "guard/tests/runtime.rs": "4f23f9a297a68344747103bb3e5f8cee0d16f0215e1e7f4bcf55310cc26c91e9",
+    "Cargo.lock": "acdc40f7a2f5acb5f15e65798626483435589c14922a9291699f9831b825bcbe",
+    "test-support/sdk-fixture.mjs": "4e8bef2382f4857e6384e82220272afe07cc366a9853f545116463dbb3355c5f",
+    "test-support/browser-runtime-wire.mjs": "bcc539856cf48f3ccb0c76d2d36160c07e00673af3ac5653f2309efa35391533",
+    "../src/live-chain.mjs": "92553f8100866b6033b255ad50a395fb7d58d16944d119b72920aefbc689d5dc",
+    "../src/guarded-trade.mjs": "323a486988c87fe78dba9665dcd7289bfd87b386d1b1cafb6d025006dddcfe68",
+    "../package-lock.json": "1de4f8e369d02482e3f4f3a90a491c9cafd6682322f97df0f03c59303da5dd62",
+    "target/deploy/senro_guard.so": "3d94ce25b9449a44b3ecb6bbf4ced29a8a679436ba3f7484694282808e65398e"
+  }
+}

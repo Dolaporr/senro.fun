@@ -83,6 +83,9 @@ impl Env {
         Self::with_atas(cap, true)
     }
     fn with_atas(cap: u64, prepare: bool) -> Self {
+        Self::with_policy(cap, prepare, true)
+    }
+    fn with_policy(cap: u64, prepare: bool, initialize: bool) -> Self {
         let mut svm = LiteSVM::new().with_precompiles().with_log_bytes_limit(None);
         svm.add_program_from_file(addr(&ID), root().join("target/deploy/senro_guard.so"))
             .expect("build the guard first with cargo build-sbf");
@@ -165,23 +168,25 @@ impl Env {
                 sync,
             ]);
         }
-        // Dust a yet-uninitialized policy to prove prefunding cannot squat its address.
-        e.ok(&[convert(solana_program::system_instruction::transfer(
-            &wallet, &e.policy, 1_000_000,
-        ))]);
-        let init = Instruction {
-            program_id: addr(&ID),
-            accounts: vec![
-                meta(e.policy, false, true),
-                meta(wallet, true, true),
-                meta(mint, false, false),
-                meta(e.keys.pool, false, false),
-                meta(base_program, false, false),
-                meta(SYSTEM_PROGRAM_ID, false, false),
-            ],
-            data: [vec![0], cap.to_le_bytes().to_vec()].concat(),
-        };
-        e.ok(&[init]);
+        if initialize {
+            // Dust a yet-uninitialized policy to prove prefunding cannot squat its address.
+            e.ok(&[convert(solana_program::system_instruction::transfer(
+                &wallet, &e.policy, 1_000_000,
+            ))]);
+            let init = Instruction {
+                program_id: addr(&ID),
+                accounts: vec![
+                    meta(e.policy, false, true),
+                    meta(wallet, true, true),
+                    meta(mint, false, false),
+                    meta(e.keys.pool, false, false),
+                    meta(base_program, false, false),
+                    meta(SYSTEM_PROGRAM_ID, false, false),
+                ],
+                data: [vec![0], cap.to_le_bytes().to_vec()].concat(),
+            };
+            e.ok(&[init]);
+        }
         e
     }
     fn send(
@@ -452,4 +457,173 @@ fn post_guard_failure_rolls_back_setup_wrapping_and_real_swap_together() {
     assert!(format!("{:?}", r.err).contains(&format!("Custom({})", Error::UnexpectedDebit as u32)));
     assert!(r.meta.logs.iter().any(|s| s.contains("BuyExactQuoteInV2")));
     assert_eq!(e.snapshots(), before);
+}
+
+// The JS subprocess uses the official SDK, production quote builder, policy planner
+// and v0 compiler. Execute the returned signed bytes as-is: no Rust reassembly.
+fn browser_wire(
+    e: &Env,
+    cap: &str,
+    native: u64,
+) -> solana_transaction::versioned::VersionedTransaction {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let clock: solana_clock::Clock = e.svm.get_sysvar();
+    let policy_account = e.svm.get_account(&addr(&e.policy));
+    let policy = policy_account
+        .as_ref()
+        .map(|a| base64::engine::general_purpose::STANDARD.encode(&a.data));
+    let input = serde_json::json!({
+        "testUserSecret": e.user.to_bytes().to_vec(),
+        "slot": clock.slot,
+        "blockhash": e.svm.latest_blockhash().to_string(),
+        "policyData": policy,
+        "policyOwner": policy_account.as_ref().map(|a| a.owner.to_string()),
+        "policyLamports": policy_account.as_ref().map(|a| a.lamports),
+        "cap": cap,
+        "maxNativeDebit": native.to_string(),
+    });
+    let mut child = Command::new("node")
+        .arg(root().join("test-support/browser-runtime-wire.mjs"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Node and npm dependencies are required for browser-wire tests");
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.to_string().as_bytes())
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "browser builder failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(report["wire"].as_str().unwrap())
+        .unwrap();
+    assert!(bytes.len() <= 1232);
+    assert_eq!(report["version"].as_u64(), Some(0));
+    let tx: solana_transaction::versioned::VersionedTransaction =
+        wincode::deserialize(&bytes).unwrap();
+    assert_eq!(tx.signatures.len(), 1);
+    assert_eq!(tx.message.static_account_keys()[0], e.user.pubkey());
+    println!("official browser v0 wire: {} bytes", bytes.len());
+    tx
+}
+#[test]
+fn browser_v0_creates_policy_wraps_buys_and_cleans_up_atomically() {
+    let mut e = Env::with_policy(2_000_000, false, false);
+    assert!(e.svm.get_account(&addr(&e.policy)).is_none());
+    let tx = browser_wire(&e, "0.002", 10_000_000);
+    let result = e
+        .svm
+        .send_transaction(tx)
+        .unwrap_or_else(|e| panic!("{:?}\n{}", e.err, e.meta.logs.join("\n")));
+    assert!(result
+        .logs
+        .iter()
+        .any(|line| line.contains("BuyExactQuoteInV2")));
+    assert_eq!(e.state().nonce, 1);
+    assert_eq!(e.state().revision, 1);
+    assert_eq!(e.state().max_quote, 2_000_000);
+    let user = pk(&e.user.pubkey());
+    let base = pda::associated_token(&user, &e.keys.base_token_program, &e.keys.base_mint);
+    assert!(
+        u64::from_le_bytes(
+            e.svm.get_account(&addr(&base)).unwrap().data[64..72]
+                .try_into()
+                .unwrap()
+        ) > 0
+    );
+    let quote = pda::associated_token(&user, &TOKEN_PROGRAM_ID, &NATIVE_MINT);
+    assert_eq!(
+        e.svm
+            .get_account(&addr(&quote))
+            .map(|a| a.lamports)
+            .unwrap_or(0),
+        0
+    );
+    println!(
+        "browser creation + swap: {} CU; {} lamports fee",
+        result.compute_units_consumed, result.fee
+    );
+}
+#[test]
+fn browser_v0_updates_policy_and_executes_swap_in_one_message() {
+    let mut e = Env::with_policy(2_000_000, false, true);
+    let tx = browser_wire(&e, "0.003", 10_000_000);
+    let result = e
+        .svm
+        .send_transaction(tx)
+        .unwrap_or_else(|e| panic!("{:?}\n{}", e.err, e.meta.logs.join("\n")));
+    assert!(result
+        .logs
+        .iter()
+        .any(|line| line.contains("BuyExactQuoteInV2")));
+    assert_eq!(e.state().nonce, 1);
+    assert_eq!(e.state().revision, 2);
+    assert_eq!(e.state().max_quote, 3_000_000);
+}
+#[test]
+fn browser_v0_post_swap_failure_rolls_back_policy_creation_and_account_setup() {
+    browser_rollback(false);
+}
+#[test]
+fn browser_v0_post_swap_failure_rolls_back_policy_update_and_account_setup() {
+    browser_rollback(true);
+}
+fn browser_rollback(existing: bool) {
+    let mut e = Env::with_policy(2_000_000, false, existing);
+    let mut expected = e.snapshots();
+    let tx = browser_wire(&e, "0.003", 0);
+    let failure = e
+        .svm
+        .send_transaction(tx)
+        .expect_err("native debit bound must reject after CPI");
+    assert!(
+        format!("{:?}", failure.err)
+            .contains(&format!("Custom({})", Error::UnexpectedDebit as u32)),
+        "{:?}\n{}",
+        failure.err,
+        failure.meta.logs.join("\n")
+    );
+    assert!(failure
+        .meta
+        .logs
+        .iter()
+        .any(|line| line.contains("BuyExactQuoteInV2")));
+    // The browser user really is the fee payer here. Only the non-refundable network
+    // fee may differ; created accounts, swap effects and policy changes must revert.
+    expected
+        .get_mut(&e.user.pubkey())
+        .unwrap()
+        .as_mut()
+        .unwrap()
+        .lamports -= failure.meta.fee;
+    assert_eq!(e.snapshots(), expected);
+    if existing {
+        assert_eq!(e.state().nonce, 0);
+        assert_eq!(e.state().revision, 1);
+    }
+}
+
+#[test]
+fn browser_v0_ignores_untrusted_dust_and_initializes_its_policy() {
+    let mut e = Env::with_policy(2_000_000, false, false);
+    e.ok(&[convert(solana_program::system_instruction::transfer(
+        &pk(&e.user.pubkey()),
+        &e.policy,
+        1_000_000,
+    ))]);
+    let tx = browser_wire(&e, "0.002", 10_000_000);
+    e.svm
+        .send_transaction(tx)
+        .unwrap_or_else(|e| panic!("{:?}\n{}", e.err, e.meta.logs.join("\n")));
+    assert_eq!(e.state().nonce, 1);
+    assert_eq!(e.state().revision, 1);
 }

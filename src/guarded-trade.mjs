@@ -1,5 +1,5 @@
 import {Buffer} from 'buffer';
-import {PublicKey,VersionedTransaction} from '@solana/web3.js';
+import {PublicKey,SystemProgram,VersionedTransaction} from '@solana/web3.js';
 import {sha256,hex,parseAmount} from './policy-client.mjs';
 import {LOCAL_PROGRAM_ID,POLICY_LENGTH,policyAddress,policyFingerprint,decodePolicy,createPolicyInstruction,updatePolicyInstruction,guardPumpSwapInstructions} from '../protocol/client/guard.mjs';
 const MAINNET='5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';
@@ -27,29 +27,39 @@ export async function verifyDeployment(connection,d,minContextSlot=0){
  if(authority!==d.upgradeAuthority||await digest(bytes.subarray(45))!==d.executableSha256)throw Error('Guard code or upgrade authority changed. Trading is disabled.');
  return response.context.slot;
 }
-export async function prepareGuardedInstructions({connection,deployment,market,wallet,config,instructions,maxNativeDebit}){
+export function isUninitializedPolicyAccount(account){
+ return account===null||!!account&&!account.executable&&account.owner.equals(SystemProgram.programId)&&account.data.length===0;
+}
+export async function planGuardedInstructions({programId,market,wallet,config,instructions,maxNativeDebit,snapshot}){
  requireSupportedDraft(config);
  if(market.venue!=='PumpSwap')throw Error('Guarded trading supports canonical SOL PumpSwap buys only.');
  if(typeof maxNativeDebit!=='bigint'||maxNativeDebit<0n)throw Error('Review an explicit maximum additional CPI SOL debit.');
- const verifiedSlot=await verifyDeployment(connection,deployment,market.slot);
- const programId=key(deployment.programId),user=key(wallet),mint=key(market.mint),pool=key(market.venueAddress),tokenProgram=key(market.tokenProgram),cap=parseAmount(config.cap,9);
- const [address,bump]=policyAddress({programId,wallet:user,mint,pool});
- const snapshot=await connection.getAccountInfoAndContext(address,{commitment:'confirmed',minContextSlot:verifiedSlot});
- if(snapshot.context.slot<verifiedSlot)throw Error('RPC returned a stale policy snapshot.');
- const original=snapshot.value;let policy,write=[],action='Keep existing cap';
- // A prefunded system account is accepted by the program, but the browser conservatively
- // refuses occupied addresses of any other owner or unexpected layout.
- if(!original){policy={wallet:user,mint,pool,tokenProgram,maxQuote:cap,revision:1n,nonce:0n,bump,active:true};write=[createPolicyInstruction({programId,wallet:user,mint,pool,tokenProgram,maxQuote:cap})];action='Create wallet policy';}
+ const guardProgram=key(programId),user=key(wallet),mint=key(market.mint),pool=key(market.venueAddress),tokenProgram=key(market.tokenProgram),cap=parseAmount(config.cap,9);
+ const [address,bump]=policyAddress({programId:guardProgram,wallet:user,mint,pool});
+ const original=snapshot.value,uninitialized=isUninitializedPolicyAccount(original);let policy,write=[],action='Keep existing cap';
+ // Anyone can dust this PDA. Empty system-owned prefunding must not block its owner.
+ if(uninitialized){policy={wallet:user,mint,pool,tokenProgram,maxQuote:cap,revision:1n,nonce:0n,bump,active:true};write=[createPolicyInstruction({programId:guardProgram,wallet:user,mint,pool,tokenProgram,maxQuote:cap})];action='Create wallet policy';}
  else{
-  if(!original.owner.equals(programId)||original.executable)throw Error('Unexpected policy account owner.');
+  if(!original.owner.equals(guardProgram)||original.executable)throw Error('Unexpected policy account owner.');
   policy=decodePolicy(original.data);
   if(!policy.wallet.equals(user)||!policy.mint.equals(mint)||!policy.pool.equals(pool)||!policy.tokenProgram.equals(tokenProgram)||policy.bump!==bump)throw Error('Policy does not match this wallet and market.');
-  if(policy.maxQuote!==cap||!policy.active){write=[updatePolicyInstruction({programId,policy:address,wallet:user,expectedRevision:policy.revision,maxQuote:cap,active:true})];policy={...policy,maxQuote:cap,revision:policy.revision+1n,active:true};action='Update wallet policy';}
+  if(policy.maxQuote!==cap||!policy.active){write=[updatePolicyInstruction({programId:guardProgram,policy:address,wallet:user,expectedRevision:policy.revision,maxQuote:cap,active:true})];policy={...policy,maxQuote:cap,revision:policy.revision+1n,active:true};action='Update wallet policy';}
  }
  const deadlineSlot=BigInt(snapshot.context.slot)+100n;
- const guarded=guardPumpSwapInstructions({instructions,programId,policy,policyAddress:address,deadlineSlot,maxNativeDebit});
- const rent=original?0:await connection.getMinimumBalanceForRentExemption(POLICY_LENGTH,'confirmed');
- return {instructions:[...write,...guarded],guard:{programId:programId.toBase58(),policyAddress:address.toBase58(),policyBefore:original?await digest(original.data):null,policyHash:hex(policyFingerprint(policy,programId)),nonce:policy.nonce.toString(),deadlineSlot:deadlineSlot.toString(),maxQuote:cap.toString(),maxNativeDebit:maxNativeDebit.toString(),policyRent:rent,policyAction:action,minContextSlot:snapshot.context.slot}};
+ const guarded=guardPumpSwapInstructions({instructions,programId:guardProgram,policy,policyAddress:address,deadlineSlot,maxNativeDebit});
+ return {instructions:[...write,...guarded],guard:{programId:guardProgram.toBase58(),policyAddress:address.toBase58(),policyBefore:uninitialized?null:await digest(original.data),policyHash:hex(policyFingerprint(policy,guardProgram)),nonce:policy.nonce.toString(),deadlineSlot:deadlineSlot.toString(),maxQuote:cap.toString(),maxNativeDebit:maxNativeDebit.toString(),policyRent:0,policyAction:action,minContextSlot:snapshot.context.slot}};
+}
+export async function prepareGuardedInstructions(params){
+ const {connection,deployment,market,wallet,config}=params;
+ requireSupportedDraft(config);
+ if(market.venue!=='PumpSwap')throw Error('Guarded trading supports canonical SOL PumpSwap buys only.');
+ const verifiedSlot=await verifyDeployment(connection,deployment,market.slot);
+ const [address]=policyAddress({programId:deployment.programId,wallet,mint:market.mint,pool:market.venueAddress});
+ const snapshot=await connection.getAccountInfoAndContext(address,{commitment:'confirmed',minContextSlot:verifiedSlot});
+ if(snapshot.context.slot<verifiedSlot)throw Error('RPC returned a stale policy snapshot.');
+ const result=await planGuardedInstructions({...params,programId:deployment.programId,snapshot});
+ result.guard.policyRent=isUninitializedPolicyAccount(snapshot.value)?Math.max(0,await connection.getMinimumBalanceForRentExemption(POLICY_LENGTH,'confirmed')-(snapshot.value?.lamports??0)):0;
+ return result;
 }
 export async function sealGuardReview(result,transaction){
  if(!result.ok||result.enforcement!=='senro-guard'||!result.guard||result.checks.some(c=>c.state==='block'||c.state==='unknown'))throw Error('Only a successful guarded simulation can be reviewed.');
@@ -66,7 +76,7 @@ async function checkReview({connection,deployment,ticket,fingerprint,isCurrent,n
  const snapshot=await connection.getAccountInfoAndContext(key(ticket.guard.policyAddress),{commitment:'confirmed',minContextSlot:ticket.guard.minContextSlot});
  if(snapshot.context.slot<ticket.guard.minContextSlot)throw Error('RPC returned a stale policy snapshot.');
  const account=snapshot.value;
- if(ticket.guard.policyBefore===null?account!==null:!account||!account.owner.equals(key(deployment.programId))||await digest(account.data)!==ticket.guard.policyBefore)throw Error('Policy or nonce changed. Simulate again.');
+ if(ticket.guard.policyBefore===null?!isUninitializedPolicyAccount(account):!account||!account.owner.equals(key(deployment.programId))||await digest(account.data)!==ticket.guard.policyBefore)throw Error('Policy or nonce changed. Simulate again.');
  const [epoch,height]=await Promise.all([connection.getEpochInfo('confirmed'),connection.getBlockHeight('confirmed')]);
  if(BigInt(epoch.absoluteSlot)>=BigInt(ticket.guard.deadlineSlot)||height>ticket.lastValidBlockHeight)throw Error('Trade deadline expired. Simulate again.');
  if(!isCurrent()||now()>=ticket.expiresAt)throw Error('Trade review changed or expired. Simulate again.');

@@ -30,7 +30,7 @@ The frontend supports wallet address connection, contract address (CA) discovery
 
 The guard implements trade caps and per-intent bounds. It does not yet implement rolling volume, sell cooldowns, account caps, bonding-curve routing, or automated orders. Direct venue trades bypass it. The embedded program identity is a local test placeholder.
 
-Requires Rust, cargo-build-sbf 4.5.0, platform-tools v1.57, and ordinary compiler/OpenSSL dependencies on Linux:
+Requires Node/npm dependencies, Rust, cargo-build-sbf 4.5.0, platform-tools v1.57, and ordinary compiler/OpenSSL dependencies on Linux:
 
 ```sh
 python3 scripts/fetch-guard-fixtures.py
@@ -39,7 +39,7 @@ npm run test:guard
 
 Captured Pump executables and generated guard binaries are excluded. The fetch script validates pinned executable hashes and fails if upstream deployments changed; it never silently updates pins. Set `SENRO_RPC_URL` for another HTTPS Solana mainnet RPC if the public endpoint rate-limits requests. Keep authenticated endpoints private.
 
-The original local validation recorded 16 Rust checks (3 unit and 13 runtime). The JavaScript suite has 46 tests, including guarded browser-flow and read-only deployment-preflight regressions. See `protocol/VALIDATION.md` for recorded results, provenance, and limitations; recorded checks are not an audit.
+Current local validation: **21 Rust checks** (3 unit + 18 runtime) and **51 JavaScript tests**. Five runtime checks execute unchanged signed version-0 messages from the shared browser assembly code against the captured real PumpSwap program. See `protocol/BROWSER_VALIDATION.md` for evidence and limits. See `protocol/VALIDATION.md` for recorded results, provenance, and limitations; recorded checks are not an audit.
 
 ## Source map
 

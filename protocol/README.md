@@ -25,9 +25,11 @@ Put setup, guarded trade and cleanup in one transaction when integrating the cli
 
 The quote cap is denominated in wrapped SOL. Transaction fees and account setup outside the guard are not that quote amount. `maxNativeDebit` separately limits native SOL spent inside the PumpSwap CPI, including any account rent. Transaction fees remain payable even when a submitted transaction fails; runtime rollback tests use a separate fee sponsor and assert the user's native SOL, quote/base accounts, pool/vaults, policy, volume accumulator and fee-recipient accounts remain unchanged on guard rejection.
 
+For the shared browser assembly tests and the prefunded-policy fix, see [BROWSER_VALIDATION.md](BROWSER_VALIDATION.md).
+
 ## Build and run
 
-Install Rust, `cargo-build-sbf` 4.5.0, and platform-tools v1.57. Then, from the project root:
+Install Node/npm dependencies (`npm ci`), Rust, `cargo-build-sbf` 4.5.0, and platform-tools v1.57. Then, from the project root:
 
 ```sh
 python3 scripts/fetch-guard-fixtures.py

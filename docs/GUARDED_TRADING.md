@@ -18,7 +18,7 @@ The browser now has a guarded PumpSwap transaction path and Wallet Standard sign
 
 JavaScript tests cover new/existing policies, exact atomic instruction replacement, deployment pins and chain checks, input/policy changes during wallet approval, message tampering, invalid signatures, cancellation, expiration, single-use reviews, submission timeouts, and confirmation states using mocked RPC/wallets and real message signing. These do not establish on-chain browser integration success.
 
-The Rust guard and its prior local runtime evidence are unchanged. Re-run runtime tests and validate the complete browser-generated transaction against the intended venue deployment before enabling trading. This integration has not been independently reviewed.
+The Rust guard implementation is unchanged. Five new LiteSVM tests execute the exact signed version-0 messages from the shared browser assembly functions with the official SDK and captured venue programs. Creation, update, success, post-CPI rollback and policy prefunding passed; see `protocol/BROWSER_VALIDATION.md`. These are local fixture tests, not public-chain or real-extension-wallet validation. Re-run runtime tests and validate the complete browser-generated transaction against the intended venue deployment before enabling trading. This integration has not been independently reviewed.
 
 ## Release prerequisites
 

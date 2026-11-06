@@ -54,10 +54,8 @@ export function assessRules(config,{input,postBalance,decimals,simulationOk}){
 }
 export async function requestFingerprint(request){return hex(await sha256(new TextEncoder().encode(JSON.stringify(request))));}
 export function assertFreshResult(result,fingerprint,now=Date.now()){if(!result||result.requestFingerprint!==fingerprint)throw Error('The inputs changed. Run a fresh simulation.');if(now>=result.expiresAt)throw Error('This simulation has expired. Run it again.');if(!result.ok)throw Error('The venue simulation failed.');return true;}
-export async function simulateBuy({connection,market:initialMarket,wallet,amount,slippageBps,config,revision,guarded=null,onProgress=()=>{}}){
- const input=parseAmount(amount,9);if(input===0n)throw Error('Enter a SOL amount greater than zero.');
- const user=publicKey(wallet);if(!PublicKey.isOnCurve(user.toBytes()))throw Error('The simulation address must be a wallet public key.');
- onProgress('Refreshing market');const market=await inspectMarket(connection,initialMarket.mint),mint=publicKey(market.mint),tokenProgram=publicKey(market.tokenProgram);
+export async function buildVenueBuyInstructions({connection,market,user,input,slippageBps,onProgress=()=>{}}){
+ const mint=publicKey(market.mint),tokenProgram=publicKey(market.tokenProgram);
  const [pump,amm]=await sdks();const budget=new BN(input.toString());let expected,instructions,minOut;
  onProgress('Building venue transaction');
  if(market.venue==='Pump bonding curve'){
@@ -76,6 +74,19 @@ export async function simulateBuy({connection,market:initialMarket,wallet,amount
   expected=BigInt(quote.base.toString());minOut=minimumOutput(expected,slippageBps);
   instructions=await amm.PUMP_AMM_SDK.buyExactQuoteInV2Instructions(state,budget,new BN(minOut.toString()));
  }
+ return {expected,minOut,instructions};
+}
+export function assembleBuyTransaction({user,blockhash,instructions}){
+ const message=new TransactionMessage({payerKey:publicKey(user),recentBlockhash:blockhash,instructions:[ComputeBudgetProgram.setComputeUnitLimit({units:400000}),...instructions]}).compileToV0Message();
+ const transaction=new VersionedTransaction(message);if(transaction.serialize().length>1232)throw Error('This transaction exceeds Solana’s packet limit.');
+ return transaction;
+}
+export async function simulateBuy({connection,market:initialMarket,wallet,amount,slippageBps,config,revision,guarded=null,onProgress=()=>{}}){
+ const input=parseAmount(amount,9);if(input===0n)throw Error('Enter a SOL amount greater than zero.');
+ const user=publicKey(wallet);if(!PublicKey.isOnCurve(user.toBytes()))throw Error('The simulation address must be a wallet public key.');
+ onProgress('Refreshing market');const market=await inspectMarket(connection,initialMarket.mint),mint=publicKey(market.mint),tokenProgram=publicKey(market.tokenProgram);
+ const built=await buildVenueBuyInstructions({connection,market,user,input,slippageBps,onProgress});
+ const {expected,minOut}=built;let {instructions}=built;
  let guard=null;
  if(guarded){onProgress('Verifying guard and wallet policy');const prepared=await prepareGuardedInstructions({connection,deployment:guarded.deployment,market,wallet:user,config,instructions,maxNativeDebit:guarded.maxNativeDebit});instructions=prepared.instructions;guard=prepared.guard;}
  const ata=PublicKey.findProgramAddressSync([user.toBuffer(),tokenProgram.toBuffer(),mint.toBuffer()],ATA_PROGRAM)[0];
@@ -83,8 +94,7 @@ export async function simulateBuy({connection,market:initialMarket,wallet,amount
  if(!before.value[0])throw Error('This wallet has no mainnet SOL account. Fund it before simulating a buy.');
  const preBalance=tokenAmount(before.value[1],market.mint,user.toBase58(),market.tokenProgram);
  const {blockhash,lastValidBlockHeight}=await connection.getLatestBlockhash('confirmed');
- const message=new TransactionMessage({payerKey:user,recentBlockhash:blockhash,instructions:[ComputeBudgetProgram.setComputeUnitLimit({units:400000}),...instructions]}).compileToV0Message();
- const transaction=new VersionedTransaction(message);const wire=transaction.serialize();if(wire.length>1232)throw Error('This transaction exceeds Solana’s packet limit. No split transaction will be simulated.');
+ const transaction=assembleBuyTransaction({user,blockhash,instructions}),message=transaction.message;
  const request={cluster:'mainnet-beta',wallet:user.toBase58(),mint:market.mint,venue:market.venueProgram,amount:input.toString(),slippageBps,revision,config,...(guard?{guard}: {})};
  const fingerprint=await requestFingerprint(request),messageHash=hex(await sha256(message.serialize()));
  onProgress('Simulating on mainnet');
