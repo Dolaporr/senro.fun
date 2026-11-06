@@ -52,3 +52,7 @@ Verification: **80 JavaScript tests pass**, including URL encoding, same-origin 
 References:
 - https://docs.phantom.com/phantom-deeplinks/other-methods/browse
 - https://docs.solflare.com/solflare/technical/deeplinks/other-methods/browse
+
+## Owner's iPhone/Solflare results — 6 November 2026
+
+The owner supplied screenshots and reports confirming mobile app handoff, Solflare provider detection, connection rejection and retry/approval, disconnect, account switching, unsigned PumpSwap previews, trade-cap assessment, saved-rule persistence, six local scenario outcomes, Activity details and verified off-chain message signing. The 0.0001 SOL preview showed matching quoted/received output of 4.24075 tokens; the 0.0002 SOL preview correctly showed a locally blocked trade-size assessment under the 0.0001 SOL cap. These are observed owner tests on this device; guarded transaction signing, on-chain policies and real transaction confirmation remain untested. See LIVE_TRADING_ROLLOUT.md for the deployment path.

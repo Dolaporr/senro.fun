@@ -33,7 +33,7 @@ The homepage now introduces SENRO, has a working local trade-cap example, explai
 ## Remaining release gates
 
 1. Preserve the verified Netlify build and function configuration. After each release, run `npm run check:live -- https://senrotech.netlify.app`. The latest deployment passed the strict asset types, deployed WASM scenarios, API denial and mainnet checks. A folder-only deployment must also include the deployed function.
-2. Test real Phantom/Solflare or the intended Wallet Standard wallet: detected logo, connection rejection, account switch, disconnect and off-chain message check. Also check a real iOS/Android wallet browser. No real extension is available in the QA browser.
+2. The owner has now tested Solflare on iPhone: provider/logo detection, connect/reject/disconnect, reported account switching, and verified off-chain message signing passed. Other wallets/devices and actual transaction signing remain unverified. See docs/WALLET_VALIDATION.md and docs/LIVE_TRADING_ROLLOUT.md.
 3. For live trading, verify a final guard build and its actual cluster deployment, deployed program identity/hash, upgrade authority, policy setup, browser transaction bytes, rejection rollback, nonce/expiry and confirmation behaviour. Keep src/guard-deployment.mjs disabled until then.
 4. Only the guard's per-trade cap is implemented for the narrow guarded buy. Rolling history, cooldown and account-cap enforcement are not a deployed complete product; do not advertise all rules as live enforcement. Direct venue trades remain bypassable.
 5. Obtain independent review of the custody/signing/CPI and upgrade paths before a meaningful-funds release. No audit or mainnet readiness is implied by the automated tests.

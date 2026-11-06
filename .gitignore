@@ -13,3 +13,6 @@ protocol/target/
 .DS_Store
 __pycache__/
 *.py[cod]
+
+# Local deployment configuration
+.senro-local/
