@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFile,stat} from 'node:fs/promises';
+import solana,{config} from '../netlify/functions/solana.mjs';
+const root=new URL('../dist/',import.meta.url),html=await readFile(new URL('index.html',root),'utf8');
+assert.match(html,/SENRO/);assert.match(html,/rel="icon"/);assert.match(html,/apple-touch-icon/);
+for(const asset of ['favicon.svg','manifest.webmanifest','icons/apple-touch-icon.png','icons/icon-192.png','icons/icon-512.png','engine/senro_browser_guard.wasm'])assert.ok((await stat(new URL(asset,root))).size>0,asset+' missing');
+await WebAssembly.compile(await readFile(new URL('engine/senro_browser_guard.wasm',root)));
+for(const [,path] of html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g))assert.ok((await stat(new URL(path.slice(1),root))).size>0);
+assert.equal(config.path,'/api/solana');
+const response=await solana(new Request('https://senro.test/api/solana',{method:'POST',headers:{'content-type':'application/json','origin':'https://senro.test'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'sendTransaction',params:[]})}));assert.equal(response.status,400);
+assert.equal((await solana(new Request('https://senro.test/api/solana'))).status,405);
+console.log('Netlify artifact verified: static app, assets, WASM, favicon/app icons, function route and broadcast rejection.');

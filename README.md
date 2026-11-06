@@ -39,7 +39,7 @@ npm run test:guard
 
 Captured Pump executables and generated guard binaries are excluded. The fetch script validates pinned executable hashes and fails if upstream deployments changed; it never silently updates pins. Set `SENRO_RPC_URL` for another HTTPS Solana mainnet RPC if the public endpoint rate-limits requests. Keep authenticated endpoints private.
 
-Current local validation: **21 Rust checks** (3 unit + 18 runtime) and **70 JavaScript tests**. Five runtime checks execute unchanged signed version-0 messages from the shared browser assembly code against the captured real PumpSwap program. See `protocol/BROWSER_VALIDATION.md` for runtime evidence and limits, and `docs/WALLET_VALIDATION.md` for the newer wallet-session checks. See `protocol/VALIDATION.md` for recorded results, provenance, and limitations; recorded checks are not an audit.
+Current local validation: **21 Rust checks** (3 unit + 18 runtime) and **73 JavaScript tests**. Five runtime checks execute unchanged signed version-0 messages from the shared browser assembly code against the captured real PumpSwap program. See `protocol/BROWSER_VALIDATION.md` for runtime evidence and limits, and `docs/WALLET_VALIDATION.md` for the newer wallet-session checks. See `protocol/VALIDATION.md` for recorded results, provenance, and limitations; recorded checks are not an audit.
 
 ## Source map
 
@@ -60,3 +60,11 @@ See `docs/GUARDED_TRADING.md` for the disabled browser integration, validation s
 Apache-2.0. Includes Pump Hooks source adapted from https://github.com/Pumphooks/pumphooks at commit `b7fc9f008ebd474b29a770ec7c4d434df84eff2d`. See `LICENSE`, `NOTICE` and `protocol/NOTICE`. SENRO is not affiliated with Pump.fun or endorsed by Pump Hooks.
 
 For owner-controlled signing setup and read-only rent estimates, see `docs/DEPLOYMENT_PREFLIGHT.md`.
+
+## Netlify deployment
+
+Connect this repository to the existing Netlify project and use its committed `netlify.toml`: build command `npm run build:netlify`, publish directory `dist`, functions directory `netlify/functions`, Node 22. This publishes the static Vite app and the read-only `/api/solana` function. `npm run build` remains the separate ChatGPT Sites Worker build. A static folder upload alone does not deploy the function.
+
+Before deployment: `npm test && npm run build:netlify && npm run check:netlify`. After deployment: `npm run check:live -- https://senrotech.netlify.app`. The latter uses only asset reads, mainnet genesis verification and an intentionally empty rejected broadcast-method request; it never signs or sends a transaction.
+
+See [launch readiness](docs/LAUNCH_READINESS.md) for verified results and outstanding release blockers.

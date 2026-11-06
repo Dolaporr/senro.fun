@@ -7,8 +7,9 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "test": "node --test tests/*.test.mjs",
-    "build:worker": "vite build && node scripts/build-worker.mjs",
-    "test:guard": "bash scripts/test-guard.sh"
+    "build:netlify": "vite build",
+    "check:netlify": "node scripts/validate-netlify.mjs",
+    "check:live": "node scripts/check-live-site.mjs"
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",
@@ -24,8 +25,5 @@
   },
   "devDependencies": {
     "vite": "8.3.6"
-  },
-  "engines": {
-    "node": ">=22.12.0"
   }
 }

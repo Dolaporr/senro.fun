@@ -3,7 +3,7 @@ import {useReducedMotion} from 'framer-motion';
 import {Pause,Play} from 'lucide-react';
 
 // Original procedural artwork. No video download, tracking or pointer listener.
-export function FlowField(){
+export function FlowField({variant='studio'}){
  const phase=useRef(0),ref=useRef(null),reduced=useReducedMotion(),[paused,setPaused]=useState(false);
  useEffect(()=>{
   const canvas=ref.current,ctx=canvas?.getContext('2d');if(!ctx)return;
@@ -11,13 +11,15 @@ export function FlowField(){
   const resize=()=>{const box=canvas.getBoundingClientRect();width=box.width;height=box.height;const dpr=Math.min(devicePixelRatio||1,1.5);canvas.width=width*dpr;canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);paint(time)};
   function paint(t){
    if(!width||!height)return;ctx.clearRect(0,0,width,height);
-   const cx=width*.76,cy=height*.52,scale=Math.min(width*.22,height*.72);
+   const compact=window.matchMedia('(max-width:760px)').matches;
+   const cx=width*(compact?.5:variant==='landing'?.43:.76),cy=height*.52,scale=Math.min(width*(compact?.29:.22),height*(compact?.52:.72));
    const halo=ctx.createRadialGradient(cx-60,cy-55,5,cx,cy,scale*1.25);halo.addColorStop(0,'rgba(123,102,240,.09)');halo.addColorStop(.7,'rgba(96,70,207,.035)');halo.addColorStop(1,'rgba(55,47,108,0)');ctx.fillStyle=halo;ctx.fillRect(0,0,width,height);
    const paths=[];
-   for(let j=0;j<62;j++){
-    const v=j/62*Math.PI*2,points=[];let depth=0;
-    for(let k=0;k<=140;k++){
-     const u=k/140*Math.PI*2,warp=.065*Math.sin(u*3+t*.42)+.04*Math.cos(u*5-t*.25),tube=.23+.035*Math.sin(u*4+t*.33);
+   const ribbons=compact?38:62,segments=compact?100:140;
+   for(let j=0;j<ribbons;j++){
+    const v=j/ribbons*Math.PI*2,points=[];let depth=0;
+    for(let k=0;k<=segments;k++){
+     const u=k/segments*Math.PI*2,warp=.065*Math.sin(u*3+t*.42)+.04*Math.cos(u*5-t*.25),tube=.23+.035*Math.sin(u*4+t*.33);
      let x=(.8+warp+tube*Math.cos(v))*Math.cos(u),y=(.8+warp+tube*Math.cos(v))*Math.sin(u),z=tube*Math.sin(v);
      const twist=.28*Math.sin(t*.15)+.3,rx=x*Math.cos(twist)+z*Math.sin(twist),rz=-x*Math.sin(twist)+z*Math.cos(twist);
      const ry=y*.64-rz*.72,rdepth=y*.72+rz*.64;
@@ -42,6 +44,6 @@ export function FlowField(){
   function sync(){visible=!document.hidden;cancelAnimationFrame(frame);last=0;if(visible&&inView&&!reduced&&!paused)frame=requestAnimationFrame(tick);else paint(time)}
   const observer=new ResizeObserver(resize);observer.observe(canvas);const intersection=new IntersectionObserver(entries=>{inView=entries[0].isIntersecting;sync()});intersection.observe(canvas);document.addEventListener('visibilitychange',sync);resize();sync();
   return()=>{cancelAnimationFrame(frame);observer.disconnect();intersection.disconnect();document.removeEventListener('visibilitychange',sync)};
- },[reduced,paused]);
+ },[reduced,paused,variant]);
  return <div className="flow-art"><canvas ref={ref} aria-hidden="true"/><div className="flow-art-controls"><span className="flow-art-label" aria-hidden="true">FLOW, WITH INTENTION.</span>{!reduced&&<button type="button" aria-label={paused?"Play background motion":"Pause background motion"} onClick={()=>setPaused(p=>!p)}>{paused?<Play size={12}/>:<Pause size={12}/>}</button>}</div></div>;
 }
