@@ -32,3 +32,9 @@ The studio uses shorter icon-and-value rule controls, clearer currency/preset co
 ## Hosting
 
 The ChatGPT Site and Netlify deployment are separate. Updating one does not establish that senrotech.netlify.app has been updated. Live deployment requires its own host connection or deploying the latest GitHub source.
+
+## Wallet panel and icon refinement
+
+The connection panel is a right-aligned glass dialog with a separate read-only address form. Installed providers are detected through the existing Wallet Standard registry; their own inline data-image logos are displayed with a monogram fallback. No uninstalled provider is presented as a working connection. SENRO uses an original SVG icon family for navigation, rules, balances, network settings and wallet connection.
+
+Browser QA checked opening the panel, focus placement, expanding read-only access, the disabled empty-submit state and rejection of invalid addresses. Actual provider logo rendering, connection and signing in a real extension still require the user's browser. The 70 regression tests and production build pass; trading remains disabled.
