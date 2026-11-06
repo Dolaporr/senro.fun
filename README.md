@@ -39,7 +39,7 @@ npm run test:guard
 
 Captured Pump executables and generated guard binaries are excluded. The fetch script validates pinned executable hashes and fails if upstream deployments changed; it never silently updates pins. Set `SENRO_RPC_URL` for another HTTPS Solana mainnet RPC if the public endpoint rate-limits requests. Keep authenticated endpoints private.
 
-The original local validation recorded 16 Rust checks (3 unit and 13 runtime). The JavaScript suite has 28 tests. See `protocol/VALIDATION.md` for recorded results, provenance, and limitations; recorded checks are not an audit.
+The original local validation recorded 16 Rust checks (3 unit and 13 runtime). The JavaScript suite has 44 tests, including 16 guarded browser-flow regressions using mocked RPC/wallets. See `protocol/VALIDATION.md` for recorded results, provenance, and limitations; recorded checks are not an audit.
 
 ## Source map
 
