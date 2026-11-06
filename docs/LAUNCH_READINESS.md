@@ -1,6 +1,6 @@
 # SENRO readiness review — 6 November 2026
 
-Current decision: do not launch live trading. The simulation and rule-design product has a working local release candidate, subject to the hosting-header redeployment and real-wallet checks below. This review is not an independent security audit.
+Current decision: do not launch live trading. The simulation and rule-design product has a working local release candidate, with live Netlify deployment checks passing and real-wallet checks still required. This review is not an independent security audit.
 
 ## Landing page
 
@@ -32,7 +32,7 @@ The homepage now introduces SENRO, has a working local trade-cap example, explai
 
 ## Remaining release gates
 
-1. Redeploy the latest source to apply the explicit manifest/WASM response headers. The existing Netlify function and mainnet reads are now verified live. Run `npm run check:live -- https://senrotech.netlify.app` after deployment; the stricter check currently detects an `application/octet-stream` manifest response. A folder-only deployment must also include the deployed function.
+1. Preserve the verified Netlify build and function configuration. After each release, run `npm run check:live -- https://senrotech.netlify.app`. The latest deployment passed the strict asset types, deployed WASM scenarios, API denial and mainnet checks. A folder-only deployment must also include the deployed function.
 2. Test real Phantom/Solflare or the intended Wallet Standard wallet: detected logo, connection rejection, account switch, disconnect and off-chain message check. Also check a real iOS/Android wallet browser. No real extension is available in the QA browser.
 3. For live trading, verify a final guard build and its actual cluster deployment, deployed program identity/hash, upgrade authority, policy setup, browser transaction bytes, rejection rollback, nonce/expiry and confirmation behaviour. Keep src/guard-deployment.mjs disabled until then.
 4. Only the guard's per-trade cap is implemented for the narrow guarded buy. Rolling history, cooldown and account-cap enforcement are not a deployed complete product; do not advertise all rules as live enforcement. Direct venue trades remain bypassable.
@@ -47,7 +47,9 @@ Saved rule sets are local to the device, and activity is session-only. Users mus
 
 - The Netlify homepage references the latest icon/hover release bundles. The existing live check passed app/assets/icons/WASM existence, API presence, broadcast rejection and mainnet genesis identity.
 - A stricter replacement now checks asset response types and PNG signatures, parses the manifest, executes all six default scenarios against the WASM fetched from the deployed host, and checks foreign-origin rejection. It rejects HTML fallbacks instead of accepting an arbitrary HTTP 200 response.
-- This stricter check found the live manifest served as `application/octet-stream` under `nosniff`. Added `public/_headers` with explicit manifest and WASM types; the build validator checks these rules are packaged. This hosting correction requires the latest Netlify deployment before a full live pass can be claimed.
+- This stricter check found the live manifest served as `application/octet-stream` under `nosniff`. Added `public/_headers` with explicit manifest and WASM types; the build validator checks these rules are packaged. After the GitHub push, the latest Netlify deployment passed the full strict check, including the corrected manifest content type.
 - Fresh unsigned buys succeeded through **the Netlify relay**, using the supplied public simulation address: Pump curve at slot **466176070**, **68,428 CU**, output **2,902,371,911 raw token units**; PumpSwap at slot **466176095**, **91,421 CU**, output **4,191,583 raw token units**. Observed output matched the SDK quote in both. Each simulated network fee was 5,000 lamports, not an actual charge.
 - Fixed the mainnet smoke CLI so `ok:false` results cause a failing exit status. Previously only thrown exceptions failed the command. Added regression coverage for this and broken deployments.
 - **76 JavaScript tests passed**. Guard source and release identity are unchanged, and live trading remains disabled. These checks use real remote reads/simulations but do not test a real wallet extension, on-chain policy enforcement, or transaction confirmation.
+
+Final post-push verification: `check:live` exited 0 against `https://senrotech.netlify.app`, with all three stages passing: app/bundles/icons; six deployed WASM scenarios; read-only API, broadcast and foreign-origin denial, and mainnet genesis. No wallet signing or live trade was performed.
