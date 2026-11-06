@@ -39,7 +39,7 @@ npm run test:guard
 
 Captured Pump executables and generated guard binaries are excluded. The fetch script validates pinned executable hashes and fails if upstream deployments changed; it never silently updates pins. Set `SENRO_RPC_URL` for another HTTPS Solana mainnet RPC if the public endpoint rate-limits requests. Keep authenticated endpoints private.
 
-The original local validation recorded 16 Rust checks (3 unit and 13 runtime). The JavaScript suite has 44 tests, including 16 guarded browser-flow regressions using mocked RPC/wallets. See `protocol/VALIDATION.md` for recorded results, provenance, and limitations; recorded checks are not an audit.
+The original local validation recorded 16 Rust checks (3 unit and 13 runtime). The JavaScript suite has 46 tests, including guarded browser-flow and read-only deployment-preflight regressions. See `protocol/VALIDATION.md` for recorded results, provenance, and limitations; recorded checks are not an audit.
 
 ## Source map
 
@@ -58,3 +58,5 @@ See `docs/GUARDED_TRADING.md` for the disabled browser integration, validation s
 ## License and attribution
 
 Apache-2.0. Includes Pump Hooks source adapted from https://github.com/Pumphooks/pumphooks at commit `b7fc9f008ebd474b29a770ec7c4d434df84eff2d`. See `LICENSE`, `NOTICE` and `protocol/NOTICE`. SENRO is not affiliated with Pump.fun or endorsed by Pump Hooks.
+
+For owner-controlled signing setup and read-only rent estimates, see `docs/DEPLOYMENT_PREFLIGHT.md`.

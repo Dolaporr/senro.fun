@@ -1,0 +1,10 @@
+import test from 'node:test';
+import {Keypair} from '@solana/web3.js';
+import assert from 'node:assert/strict';
+import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {deploymentSizes,preflight} from '../scripts/deployment-preflight.mjs';
+const wallet=Keypair.generate().publicKey.toBase58();
+test('rent sizing separates program metadata, allocated executable and upload buffer',()=>{assert.deepEqual(deploymentSizes(89176),{program:36,programData:89221,uploadBuffer:89213});assert.equal(deploymentSizes(89176,178352).programData,178397);for(const values of [[-1],[Infinity],[4,3],[4,10*1024*1024]])assert.throws(()=>deploymentSizes(...values));});
+test('preflight uses only allowlisted reads and does not mistake a funded wallet for deployment readiness',async()=>{const dir=await mkdtemp(join(tmpdir(),'senro-preflight-'));try{const artifact=join(dir,'reference.so');await writeFile(artifact,Buffer.from([127,69,76,70,1,2,3,4]));const calls=[],fetcher=async(url,options)=>{const body=JSON.parse(options.body);calls.push(body.method);return Response.json({result:body.method==='getGenesisHash'?'5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d':body.method==='getBalance'?{context:{slot:10},value:1000000}:10000});};const report=await preflight({wallet,artifact,fetcher,reference:true});assert.equal(report.readyToDeploy,false);assert.equal(report.transactionFeesIncluded,false);assert.equal(report.permanentAccountRentLamports,20000);assert.equal(report.conservativeSeparateAccountFundingLamports,30000);assert.deepEqual(calls,['getGenesisHash','getBalance','getMinimumBalanceForRentExemption','getMinimumBalanceForRentExemption','getMinimumBalanceForRentExemption']);await assert.rejects(preflight({wallet,artifact,fetcher:async()=>Response.json({result:'devnet'})}),/not Solana mainnet/);await assert.rejects(preflight({wallet,artifact,rpcUrl:'http://localhost',fetcher}),/HTTPS/);}finally{await rm(dir,{recursive:true,force:true});}});
