@@ -13,6 +13,7 @@ import {FlowField} from './flow-field.jsx';
 import {loadSnapshots,saveSnapshots} from './saved-rules.mjs';
 import {useLiveTrade,SimulationModes,LiveMarket,LiveBench,LiveDialogs,LiveActivity,GuardedBench} from './live-trade.jsx';
 import {shortAddress} from './live-chain.mjs';
+import './interaction-polish.css';
 
 const spring={type:'spring',stiffness:330,damping:32};
 const RULES=[{id:'cap',label:'Trade size',field:'cap',toggle:'capOn',unit:'quote',description:'Limit the quote amount moved by a routed trade.'},

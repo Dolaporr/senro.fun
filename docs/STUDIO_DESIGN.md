@@ -20,3 +20,10 @@ The background has a pause/play control, respects reduced-motion preferences, ca
 Browser QA exercised inline save and invalid-input rejection, saving and inspecting a named copy, loading it into Studio with a new revision, running local scenarios, viewing activity details, filtering to an empty mainnet list and pausing the animation. Responsive CSS includes 1050/760/480 pixel breakpoints; a real mobile device and actual wallet extension remain untested.
 
 The ChatGPT Site and the user's Netlify deployment are separate. Publishing this Site does not establish that the Netlify URL has updated.
+
+
+## Icon and interaction polish — 6 November 2026
+
+Simplified the shared icons into a consistent duotone family, with clearer token, preview, limit, volume, cooldown and balance symbols. Buttons now use a restrained glass highlight, edge glow and lift on pointer hover, with press and focus feedback. Reduced-motion preferences disable the moving sheen. Trading behavior is unchanged.
+
+Validation: Netlify build and artifact checks passed; all 73 JavaScript tests passed. Desktop browser review confirmed the icons and computed hover transitions. Screenshot: `docs/icons-hover-review.jpg`.

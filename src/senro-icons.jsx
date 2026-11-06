@@ -1,21 +1,22 @@
 import React from 'react';
 
-// SENRO's small optical icon set: open corners, offset rails and connection nodes.
-// All symbols share a 24px grid, a 1.5px stroke and restrained violet accents.
+// SENRO duotone symbols: familiar silhouettes, generous spacing and quiet filled planes.
+// All symbols share a 24px grid, a 1.65px stroke and restrained violet accents.
 const drawings={
- wallet:<><path d="M5 6.5h12a2 2 0 0 1 2 2v2M5 6.5V5a2 2 0 0 1 2-2h9v3.5M19 16v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2"/><path d="M15 10.5h6v6h-6a3 3 0 0 1 0-6Z"/><circle className="senro-icon-accent" cx="16" cy="13.5" r=".9" stroke="none" fill="currentColor"/></>,
- connection:<><path d="M4 9V5h6M20 15v4h-6M9 20H5v-6M15 4h4v6"/><path className="senro-icon-accent" d="m8.5 12 2.2 2.2 4.8-4.8"/><circle cx="4" cy="12" r="1.2"/><circle cx="20" cy="12" r="1.2"/></>,
- cap:<><path d="M4 18V7h4M20 18V7h-4M8 21h8"/><path className="senro-icon-accent" d="M7 7h10M9 14l3-3 3 3M12 11v7"/><path d="M3 4h3M18 4h3"/></>,
- volume:<><path d="M5.3 7A8 8 0 0 1 19 7.5M18.7 17A8 8 0 0 1 5 16.5"/><path d="M19 3v4.5h-4.5M5 21v-4.5h4.5"/><path className="senro-icon-accent" d="M9 9v6M12 7v10M15 10v4"/></>,
- cooldown:<><path d="M9 3h6M12 3v3M5.3 6.3l-2-2M18.7 6.3l2-2"/><path d="M19.6 16A8 8 0 1 0 15 20.4"/><path className="senro-icon-accent" d="M12 9v5l3 1.5M18 18v4M21 18v4"/></>,
- balance:<><path d="m4 8 8-4 8 4-8 4-8-4ZM4 12l8 4 8-4M4 16l8 4 8-4"/><path className="senro-icon-accent" d="M12 12v8"/></>,
- studio:<><path d="M4 5h7M4 19h7M17 3v7M17 14v7M3 12h7M14 12h7"/><circle className="senro-icon-accent" cx="11" cy="5" r="2"/><circle className="senro-icon-accent" cx="11" cy="19" r="2"/><circle cx="17" cy="12" r="2"/></>,
- rules:<><path d="M5 3h13v17H5V3ZM2 7v15h12"/><path className="senro-icon-accent" d="m8 8 1.2 1.2L11 7M13 8h2M8 13h7M8 16h5"/></>,
- activity:<><path d="M4 3v17h17M8 7h3M17 7h3M8 16h12"/><path className="senro-icon-accent" d="m7 12 3-2 3 3 4-4 3 2"/><circle cx="4" cy="7" r="1" fill="currentColor" stroke="none"/></>,
- preview:<><path d="M7 4H4v5M17 4h3v5M4 15v5h3M20 15v5h-3"/><path className="senro-icon-accent" d="m10 8 6 4-6 4V8Z"/></>,
- network:<><path d="m6 6 12 2M6 6l3 13M18 8l-9 11"/><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle className="senro-icon-accent" cx="9" cy="19" r="2.5"/></>,
- history:<><path d="M4 10a8 8 0 1 1 2 8M4 4v6h6"/><path className="senro-icon-accent" d="M12 7v6h4"/></>,
- address:<><path d="m8 3-4 18M17 3l-4 18M3 8h18M2 16h18"/><path className="senro-icon-accent" d="m17 3-1 5M8 3 7 8"/></>,
+ token:<><path className="senro-icon-soft" d="m12 2.8 7.8 4.6v9.2L12 21.2l-7.8-4.6V7.4L12 2.8Z"/><path d="m12 2.8 7.8 4.6v9.2L12 21.2l-7.8-4.6V7.4L12 2.8Z"/><circle cx="12" cy="12" r="3.4"/><path className="senro-icon-accent" d="M12 9.9v4.2M10.7 10.5l1.3-.6"/></>,
+ wallet:<><rect className="senro-icon-soft" x="3" y="6" width="17" height="14" rx="3"/><path d="M17 6V4.5a1.5 1.5 0 0 0-1.8-1.4L5 5.5a2.5 2.5 0 0 0-2 2.4V17a3 3 0 0 0 3 3h12a2 2 0 0 0 2-2v-2M6 6h12a2 2 0 0 1 2 2v2"/><path className="senro-icon-accent" d="M16 10h5v6h-5a3 3 0 0 1 0-6Z"/><circle cx="16.5" cy="13" r=".75" fill="currentColor" stroke="none"/></>,
+ connection:<><path className="senro-icon-soft" d="M8.5 7.5h7v9h-7z"/><path d="m10 8 2-2a4.2 4.2 0 0 1 6 6l-2 2M14 16l-2 2a4.2 4.2 0 0 1-6-6l2-2"/><path className="senro-icon-accent" d="m9 15 6-6"/></>,
+ cap:<><path className="senro-icon-soft" d="M4 18a8 8 0 0 1 16 0H4Z"/><path d="M4 18a8 8 0 0 1 16 0M3.5 5h17M7 5v2M17 5v2"/><path className="senro-icon-accent" d="m12 17 3.5-4M8 21h8"/><circle cx="12" cy="17" r="1.1" fill="currentColor" stroke="none"/></>,
+ volume:<><path className="senro-icon-soft" d="M5 13h3v7H5zM10.5 9h3v11h-3zM16 5h3v15h-3z"/><path d="M5.5 15v5M12 11v9M18.5 7v13M3 21h18"/><path className="senro-icon-accent" d="m4 9 5-4 4 1 6-3M16 3h3v3"/></>,
+ cooldown:<><circle className="senro-icon-soft" cx="12" cy="13" r="8"/><path d="M9 2h6M12 2v3M18.5 6.5l1.8-1.8"/><circle cx="12" cy="13" r="8"/><path className="senro-icon-accent" d="M12 8.5V13l3 2"/></>,
+ balance:<><ellipse className="senro-icon-soft" cx="9" cy="6" rx="6" ry="3"/><ellipse cx="9" cy="6" rx="6" ry="3"/><path d="M3 6v5c0 1.7 2.7 3 6 3M3 11v5c0 1.7 2.7 3 6 3M15 6v3"/><path className="senro-icon-soft" d="M11 14c0-1.7 2.2-3 5-3s5 1.3 5 3v4c0 1.7-2.2 3-5 3s-5-1.3-5-3v-4Z"/><ellipse className="senro-icon-accent" cx="16" cy="14" rx="5" ry="3"/><path d="M11 14v4c0 1.7 2.2 3 5 3s5-1.3 5-3v-4"/></>,
+ studio:<><rect className="senro-icon-soft" x="3" y="3" width="18" height="18" rx="4"/><path d="M5 7h14M5 17h14M9 4v6M15 14v6"/><circle className="senro-icon-accent" cx="9" cy="7" r="2.5" fill="var(--icon-knob,#242031)"/><circle className="senro-icon-accent" cx="15" cy="17" r="2.5" fill="var(--icon-knob,#242031)"/></>,
+ rules:<><rect className="senro-icon-soft" x="5" y="3" width="14" height="17" rx="2.5"/><rect x="5" y="3" width="14" height="17" rx="2.5"/><path d="M2 7v12a4 4 0 0 0 4 4h9"/><path className="senro-icon-accent" d="m8 8 1.2 1.2L11 7M13 8h3M8 13h8M8 16h5"/></>,
+ activity:<><path className="senro-icon-soft" d="M3 18V7h18v11H3Z"/><path d="M3 20h18M3 4h18"/><path className="senro-icon-accent" d="M3 12h4l2-5 4 10 2-5h6"/></>,
+ preview:<><path className="senro-icon-soft" d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"/><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"/><circle className="senro-icon-accent" cx="12" cy="12" r="3"/></>,
+ network:<><path d="m6 6 12 2M6 6l3 13M18 8l-9 11"/><circle className="senro-icon-soft" cx="6" cy="6" r="3"/><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle className="senro-icon-accent" cx="9" cy="19" r="2.5"/></>,
+ history:<><path className="senro-icon-soft" d="M4 10a8 8 0 1 1 2 8"/><path d="M4 10a8 8 0 1 1 2 8M4 4v6h6"/><path className="senro-icon-accent" d="M12 7v6h4"/></>,
+ address:<><rect className="senro-icon-soft" x="3" y="4" width="18" height="16" rx="3"/><rect x="3" y="4" width="18" height="16" rx="3"/><path className="senro-icon-accent" d="m9 9-3 3 3 3M15 9l3 3-3 3"/></>,
 };
-export function SenroIcon({name,size=20,className='',...props}){return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`senro-icon ${className}`} {...props}>{drawings[name]??drawings.connection}</svg>}
+export function SenroIcon({name,size=20,className='',...props}){return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`senro-icon ${className}`} {...props}>{drawings[name]??drawings.connection}</svg>}
 export function WalletBrand({wallet,size=32}){const [failed,setFailed]=React.useState(false);const icon=wallet?.icon;const safe=typeof icon==='string'&&/^data:image\/(png|jpeg|webp|svg\+xml);base64,/i.test(icon)&&icon.length<700000;return <span className="wallet-brand" style={{width:size,height:size}}>{safe&&!failed?<img src={icon} alt="" width={size} height={size} onError={()=>setFailed(true)}/>:<span aria-hidden="true">{wallet?.name?.slice(0,1)?.toUpperCase()||<SenroIcon name="wallet" size={19}/>}</span>}</span>}
