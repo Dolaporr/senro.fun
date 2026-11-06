@@ -33,3 +33,8 @@ footer{max-width:1240px;border-top:1px solid #b79bd211;margin:30px auto 0;paddin
 /* Mobile gets its own canvas composition; no negative horizontal inset. */
 @media(max-width:760px){.studio-intro{height:342px;padding-top:28px}.intro-copy{max-width:100%;width:100%}.intro-copy h1{font-size:38px}.intro-foot{margin-top:15px}.flow-art{inset:171px 0 0;opacity:.83;mask-image:linear-gradient(180deg,transparent,#000 15%,#000 91%,transparent)}.flow-art-controls{right:12px;bottom:17px}.flow-art-label{display:none}.flow-art-controls button{width:28px;height:28px;border-color:#b59bd63b;background:#15102088}.intro-number{display:none}}
 @media(max-width:480px){.studio-intro{height:328px;padding-top:25px}.intro-copy h1{font-size:36px}.intro-copy p{font-size:11px}.intro-foot{font-size:9px;margin-top:14px}.flow-art{inset:164px 0 0;opacity:.9;mask-image:linear-gradient(180deg,transparent,#000 15%,#000 91%,transparent)}.flow-art-controls{right:8px;bottom:12px}.flow-art-controls button{width:27px;height:27px}}
+
+/* Keep the release scope visible on desktop and mobile. */
+.studio-preview-note{max-width:1240px;margin:0 auto 20px;display:flex;align-items:flex-start;gap:10px;padding:12px 15px;border:1px solid #c5b1ff2b;border-radius:9px;background:#b5a0f009;color:#bdb0cf;font-size:11px;line-height:1.7}.studio-preview-note svg{margin-top:2px;color:#c5b1ff}.studio-preview-note strong{color:#e3d6f6;font-weight:550}.intro-copy p{max-width:355px}
+@media(max-width:1400px){.studio-preview-note{max-width:none;margin-left:5.5%;margin-right:5.5%}}
+@media(max-width:480px){.studio-preview-note{margin-left:5%;margin-right:5%;font-size:11px}.intro-copy p{max-width:285px}}
