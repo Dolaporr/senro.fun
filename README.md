@@ -2,7 +2,7 @@
 
 A rule studio for Solana: set limits and inspect an unsigned Pump / PumpSwap buy simulation before trading.
 
-**Experimental, simulation-only.** The website does not sign or broadcast transactions. The guard program is local, undeployed, unaudited, and not connected to the browser transaction builder. A passing venue simulation is not proof that SENRO rules were enforced on-chain.
+**Experimental, simulation-only.** The published configuration does not sign or broadcast transactions. The guard program is local, undeployed and unaudited. A gated browser integration is included but disabled pending deployment and end-to-end validation. A passing venue simulation is not proof that SENRO rules were enforced on-chain.
 
 ## Run the app
 
@@ -53,7 +53,7 @@ The original local validation recorded 16 Rust checks (3 unit and 13 runtime). T
 
 ## Before live trading
 
-Integrate the browser builder with the guard, choose a deployment identity and upgrade governance, verify guarded transactions end to end, and obtain independent review. Publishing this repository does not deploy a program or enable trading.
+See `docs/GUARDED_TRADING.md` for the disabled browser integration, validation scope and release prerequisites. Choose a deployment identity and upgrade governance, verify browser-generated guarded transactions end to end, and obtain independent review. Publishing this repository does not deploy a program or enable trading.
 
 ## License and attribution
 

@@ -1,6 +1,8 @@
 import {Buffer} from 'buffer';
 import {Connection,PublicKey,ComputeBudgetProgram,TransactionMessage,VersionedTransaction} from '@solana/web3.js';
 import BN from 'bn.js';
+import {prepareGuardedInstructions,sealGuardReview} from './guarded-trade.mjs';
+import {decodePolicy,policyFingerprint as guardFingerprint} from '../protocol/client/guard.mjs';
 import {sha256,hex,parseAmount} from './policy-client.mjs';
 export const DEFAULT_RPC='https://solana-rpc.publicnode.com';
 export const MAINNET_GENESIS='5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';
@@ -52,7 +54,7 @@ export function assessRules(config,{input,postBalance,decimals,simulationOk}){
 }
 export async function requestFingerprint(request){return hex(await sha256(new TextEncoder().encode(JSON.stringify(request))));}
 export function assertFreshResult(result,fingerprint,now=Date.now()){if(!result||result.requestFingerprint!==fingerprint)throw Error('The inputs changed. Run a fresh simulation.');if(now>=result.expiresAt)throw Error('This simulation has expired. Run it again.');if(!result.ok)throw Error('The venue simulation failed.');return true;}
-export async function simulateBuy({connection,market:initialMarket,wallet,amount,slippageBps,config,revision,onProgress=()=>{}}){
+export async function simulateBuy({connection,market:initialMarket,wallet,amount,slippageBps,config,revision,guarded=null,onProgress=()=>{}}){
  const input=parseAmount(amount,9);if(input===0n)throw Error('Enter a SOL amount greater than zero.');
  const user=publicKey(wallet);if(!PublicKey.isOnCurve(user.toBytes()))throw Error('The simulation address must be a wallet public key.');
  onProgress('Refreshing market');const market=await inspectMarket(connection,initialMarket.mint),mint=publicKey(market.mint),tokenProgram=publicKey(market.tokenProgram);
@@ -74,6 +76,8 @@ export async function simulateBuy({connection,market:initialMarket,wallet,amount
   expected=BigInt(quote.base.toString());minOut=minimumOutput(expected,slippageBps);
   instructions=await amm.PUMP_AMM_SDK.buyExactQuoteInV2Instructions(state,budget,new BN(minOut.toString()));
  }
+ let guard=null;
+ if(guarded){onProgress('Verifying guard and wallet policy');const prepared=await prepareGuardedInstructions({connection,deployment:guarded.deployment,market,wallet:user,config,instructions,maxNativeDebit:guarded.maxNativeDebit});instructions=prepared.instructions;guard=prepared.guard;}
  const ata=PublicKey.findProgramAddressSync([user.toBuffer(),tokenProgram.toBuffer(),mint.toBuffer()],ATA_PROGRAM)[0];
  const before=await connection.getMultipleAccountsInfoAndContext([user,ata]);
  if(!before.value[0])throw Error('This wallet has no mainnet SOL account. Fund it before simulating a buy.');
@@ -81,13 +85,21 @@ export async function simulateBuy({connection,market:initialMarket,wallet,amount
  const {blockhash,lastValidBlockHeight}=await connection.getLatestBlockhash('confirmed');
  const message=new TransactionMessage({payerKey:user,recentBlockhash:blockhash,instructions:[ComputeBudgetProgram.setComputeUnitLimit({units:400000}),...instructions]}).compileToV0Message();
  const transaction=new VersionedTransaction(message);const wire=transaction.serialize();if(wire.length>1232)throw Error('This transaction exceeds Solana’s packet limit. No split transaction will be simulated.');
- const request={cluster:'mainnet-beta',wallet:user.toBase58(),mint:market.mint,venue:market.venueProgram,amount:input.toString(),slippageBps,revision,config};
+ const request={cluster:'mainnet-beta',wallet:user.toBase58(),mint:market.mint,venue:market.venueProgram,amount:input.toString(),slippageBps,revision,config,...(guard?{guard}: {})};
  const fingerprint=await requestFingerprint(request),messageHash=hex(await sha256(message.serialize()));
  onProgress('Simulating on mainnet');
- const [sim,fee]=await Promise.all([connection.simulateTransaction(transaction,{sigVerify:false,replaceRecentBlockhash:true,commitment:'confirmed',minContextSlot:Math.max(before.context.slot,market.slot),accounts:{encoding:'base64',addresses:[user.toBase58(),ata.toBase58()]}}),connection.getFeeForMessage(message,'confirmed').catch(()=>({value:null}))]);
+ const [sim,fee]=await Promise.all([connection.simulateTransaction(transaction,{sigVerify:false,replaceRecentBlockhash:!guard,commitment:'confirmed',minContextSlot:Math.max(before.context.slot,market.slot,guard?.minContextSlot??0),accounts:{encoding:'base64',addresses:[user.toBase58(),ata.toBase58(),...(guard?[guard.policyAddress]:[])]}}),connection.getFeeForMessage(message,'confirmed').catch(()=>({value:null}))]);
  let postBalance=null,observedOutput=null,walletAfter=null;
  if(!sim.value.err&&sim.value.accounts?.[1]){postBalance=tokenAmount(sim.value.accounts[1],market.mint,user.toBase58(),market.tokenProgram);observedOutput=postBalance-preBalance;}
  if(!sim.value.err&&sim.value.accounts?.[0])walletAfter=sim.value.accounts[0].lamports;
  if(!sim.value.err&&(observedOutput===null||observedOutput<minOut))throw Error('RPC reported success without the required token output. Treat this result as unverified.');
- const createdAt=Date.now();return {ok:!sim.value.err,error:sim.value.err,logs:sim.value.logs??[],units:sim.value.unitsConsumed??null,slot:sim.context.slot,market,input:input.toString(),expected:expected.toString(),minOut:minOut.toString(),observedOutput:observedOutput?.toString()??null,postBalance:postBalance?.toString()??null,walletBefore:before.value[0].lamports,walletAfter,networkFee:fee.value,lastValidBlockHeight,blockhash,messageHash,requestFingerprint:fingerprint,createdAt,expiresAt:createdAt+30000,checks:assessRules(config,{input,postBalance,decimals:market.decimals,simulationOk:!sim.value.err}),enforcement:'venue-only',request};
+ if(guard&&!sim.value.err){
+  if(walletAfter===null||!Number.isSafeInteger(walletAfter)||!Number.isSafeInteger(fee.value))throw Error('Guarded review requires a wallet balance and network fee estimate.');
+  const info=sim.value.accounts?.[2];if(!info||info.owner!==guard.programId)throw Error('Guard simulation did not return the expected policy.');
+  const policy=decodePolicy(Buffer.from(info.data[0],'base64'));
+  if(policy.nonce!==BigInt(guard.nonce)+1n||hex(guardFingerprint(policy,guard.programId))!==guard.policyHash)throw Error('Guard simulation did not consume the expected policy nonce.');
+ }
+ const createdAt=Date.now();const result={ok:!sim.value.err,error:sim.value.err,logs:sim.value.logs??[],units:sim.value.unitsConsumed??null,slot:sim.context.slot,market,input:input.toString(),expected:expected.toString(),minOut:minOut.toString(),observedOutput:observedOutput?.toString()??null,postBalance:postBalance?.toString()??null,walletBefore:before.value[0].lamports,walletAfter,networkFee:fee.value,lastValidBlockHeight,blockhash,messageHash,requestFingerprint:fingerprint,createdAt,expiresAt:createdAt+30000,checks:assessRules(config,{input,postBalance,decimals:market.decimals,simulationOk:!sim.value.err}),enforcement:guard?'senro-guard':'venue-only',request,...(guard?{guard}:{})};
+ if(guard&&result.ok)result.guardTicket=await sealGuardReview(result,transaction);
+ return result;
 }
