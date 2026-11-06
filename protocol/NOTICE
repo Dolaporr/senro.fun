@@ -1,0 +1,14 @@
+Public export note: executable .so files are excluded. Binary names and hashes below record the original local validation. Build the guard and fetch pinned venue fixtures before rerunning.
+
+SENRO guard and development client: created for the SENRO project under Apache-2.0.
+
+vendor/pump-adapter/src is copied from Pumphooks/pumphooks, commit
+b7fc9f008ebd474b29a770ec7c4d434df84eff2d, under Apache-2.0.
+The local vendor Cargo.toml pins the Solana dependency and omits unrelated development tests.
+The pool account JSON fixtures are copied from that same repository.
+
+Captured PumpSwap and Pump Fees ELF files are public on-chain executable snapshots used
+only as independent local integration fixtures. Their provenance and hashes are recorded
+beside each binary. They are not authored by SENRO and are not relicensed by this notice.
+The root Apache license applies to the new SENRO code, not as a claim over third-party ELFs.
+Neither Pump.fun nor the upstream Pump Hooks project has endorsed this implementation.

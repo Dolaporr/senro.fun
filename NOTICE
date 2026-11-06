@@ -1,0 +1,12 @@
+SENRO
+
+Includes source adapted from Pumphooks/pumphooks, originally under Apache License 2.0.
+Upstream: https://github.com/Pumphooks/pumphooks
+Pinned commit: b7fc9f008ebd474b29a770ec7c4d434df84eff2d
+
+protocol/vendor/pump-adapter contains the pinned adapter source snapshot.
+protocol-changes/senro-router.patch records earlier router changes.
+The rule studio, route guard, clients and tests are project additions.
+See protocol/NOTICE for public account snapshot and executable provenance.
+Third-party executable binaries are not distributed in this repository.
+The upstream project and Pump.fun have not endorsed this work.

@@ -1,0 +1,31 @@
+{
+  "name": "senro-rule-studio",
+  "private": true,
+  "type": "module",
+  "version": "0.2.0",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "test": "node --test tests/*.test.mjs",
+    "build:worker": "vite build && node scripts/build-worker.mjs",
+    "test:guard": "bash scripts/test-guard.sh"
+  },
+  "dependencies": {
+    "@noble/hashes": "1.8.0",
+    "@pump-fun/pump-sdk": "^4.3.1",
+    "@solana/web3.js": "^1.98.4",
+    "@wallet-standard/app": "^1.1.1",
+    "bn.js": "^5.2.2",
+    "buffer": "^6.0.3",
+    "framer-motion": "14.9.1",
+    "lucide-react": "1.69.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "vite": "8.3.6"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

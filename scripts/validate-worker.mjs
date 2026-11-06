@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const source=await readFile(new URL('../dist/server/index.js',import.meta.url),'utf8');
+const {default:worker}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const root=await worker.fetch(new Request('https://senro.test/'));assert.equal(root.status,200);const html=await root.text();assert.match(html,/SENRO/);
+const script=html.match(/src="([^"]+\.js)"/)[1];const bundle=await worker.fetch(new Request('https://senro.test'+script));assert.equal(bundle.status,200);assert.match(bundle.headers.get('content-type'),/javascript/);
+const wasm=await worker.fetch(new Request('https://senro.test/engine/senro_browser_guard.wasm'));assert.equal(wasm.status,200);assert.equal(wasm.headers.get('content-type'),'application/wasm');await WebAssembly.compile(await wasm.arrayBuffer());
+const denied=await worker.fetch(new Request('https://senro.test/api/solana',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'sendTransaction',params:[]})}));assert.equal(denied.status,400);
+assert.equal((await worker.fetch(new Request('https://senro.test/missing'))).status,404);
+console.log('Worker artifact verified: app, JS, WASM, and broadcast rejection.');

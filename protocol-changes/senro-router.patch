@@ -1,0 +1,314 @@
+diff --git a/crates/hook-runtime/src/executor.rs b/crates/hook-runtime/src/executor.rs
+index 1a27478..40b4b16 100644
+--- a/crates/hook-runtime/src/executor.rs
++++ b/crates/hook-runtime/src/executor.rs
+@@ -159,7 +159,13 @@ pub fn install_slot(
+         _ if callbacks == 0 => info.default_callbacks,
+         _ => callbacks,
+     };
+-    if callbacks & !info.callbacks != 0 || callbacks & !HookCallback::V1_MASK != 0 {
++    // V2 fork: use the module's declared callback contract exactly. Partial coverage can
++    // omit postconditions; overlapping side/generic callbacks can double-count state.
++    let required_callbacks = if module == ModuleId::Policy { info.callbacks } else { info.default_callbacks };
++    if callbacks != required_callbacks
++        || callbacks & !info.callbacks != 0
++        || callbacks & !HookCallback::V1_MASK != 0
++    {
+         return Err(HookError::BadCallbacks(module_id));
+     }
+     if !C::is_subset(capabilities, info.capabilities) || capabilities & C::FORBIDDEN_V1 != 0 {
+diff --git a/crates/hook-runtime/tests/callback_regressions.rs b/crates/hook-runtime/tests/callback_regressions.rs
+new file mode 100644
+index 0000000..9e02d7b
+--- /dev/null
++++ b/crates/hook-runtime/tests/callback_regressions.rs
+@@ -0,0 +1,25 @@
++use bytemuck::Zeroable;
++use hook_runtime::{install_slot, modules::{max_wallet, volume_guard}, HookError};
++use hook_types::{HookCallback as Cb, HookSlot, ModuleId, MAX_HOOK_SLOTS};
++
++#[test]
++fn max_wallet_cannot_omit_the_after_check() {
++    let m=ModuleId::MaxWallet;
++    let mut slots=[HookSlot::zeroed();MAX_HOOK_SLOTS];
++    let result=install_slot(&mut slots,m as u16,m.info().default_priority,Cb::BeforeBuy.mask(),
++        m.info().capabilities,max_wallet::Config{max_base:100,start_ts:0,duration_secs:0}.encode());
++    assert_eq!(result,Err(HookError::BadCallbacks(m as u16)));
++    assert!(slots.iter().all(HookSlot::is_empty));
++}
++
++#[test]
++fn volume_guard_cannot_subscribe_twice_to_one_phase() {
++    let m=ModuleId::VolumeGuard;
++    let mut slots=[HookSlot::zeroed();MAX_HOOK_SLOTS];
++    let result=install_slot(&mut slots,m as u16,m.info().default_priority,
++        Cb::BeforeSwap.mask()|Cb::AfterSwap.mask()|Cb::AfterBuy.mask(),m.info().capabilities,
++        volume_guard::Config{max_buy_quote:100,max_sell_quote:100,window_secs:0,
++            window_max_quote:0,wallet_window_max_quote:0}.encode());
++    assert_eq!(result,Err(HookError::BadCallbacks(m as u16)));
++    assert!(slots.iter().all(HookSlot::is_empty));
++}
+diff --git a/packages/sdk/src/instructions.ts b/packages/sdk/src/instructions.ts
+index 09675c2..2a9e80a 100644
+--- a/packages/sdk/src/instructions.ts
++++ b/packages/sdk/src/instructions.ts
+@@ -214,6 +214,39 @@ export function routeIx(p: RouteArgs & ProgramOpt) {
+   );
+ }
+ 
++// ---- SENRO checked routing (development fork only)
++export interface CheckedRouteArgs extends RouteArgs {
++  programId: PublicKey;
++  expectedConfigurationHash: Uint8Array;
++  deadlineSlot: bigint;
++}
++function developmentProgram(programId: PublicKey) {
++  if (!programId || programId.equals(PUMP_HOOKS_PROGRAM_ID)) {
++    throw new Error("Pass the separately deployed development program ID; upstream mainnet is refused");
++  }
++}
++function checkedU64(value: bigint, label: string) {
++  if (typeof value !== "bigint" || value <= 0n || value > (1n << 64n) - 1n) {
++    throw new Error(`${label} must be an explicit positive u64`);
++  }
++}
++export function checkedRouteIx(p: CheckedRouteArgs) {
++  developmentProgram(p.programId);
++  checkedU64(p.amount, "amount");
++  checkedU64(p.limit, "output/input bound");
++  checkedU64(p.deadlineSlot, "slot deadline");
++  if (p.expectedConfigurationHash.length !== 32) throw new Error("configuration hash must contain 32 bytes");
++  const base = routeIx(p);
++  return ix(p.venue === Venue.PumpSwap ? "route_amm_checked" : "route_curve_checked", base.keys,
++    (w) => w.u8(p.mode).u64(p.amount).u64(p.limit).fixed(p.expectedConfigurationHash, 32).u64(p.deadlineSlot), p.programId);
++}
++/** Simulate this instruction and read its 32-byte returnData. No wallet signature is needed. */
++export function readConfigurationHashIx(p: { market: PublicKey; policyIndexes?: number[]; programId: PublicKey }) {
++  developmentProgram(p.programId);
++  return ix("read_configuration_hash", [meta(p.market),
++    ...(p.policyIndexes ?? []).map(i => meta(hooksPda.policy(p.market, i, p.programId)))], undefined, p.programId);
++}
++
+ // ---- SENTIENT
+ 
+ /** Must be preceded in the same transaction by the Ed25519 verification of the signal. */
+diff --git a/packages/sdk/test/checked.test.ts b/packages/sdk/test/checked.test.ts
+new file mode 100644
+index 0000000..b0b14de
+--- /dev/null
++++ b/packages/sdk/test/checked.test.ts
+@@ -0,0 +1,36 @@
++import {describe,it,expect} from 'vitest';
++import {PublicKey} from '@solana/web3.js';
++import {checkedRouteIx,readConfigurationHashIx,ixDiscriminator} from '../src/instructions.js';
++import {PUMP_HOOKS_PROGRAM_ID,TradeMode,Venue} from '../src/constants.js';
++const custom=new PublicKey(new Uint8Array(32).fill(11));
++const base={programId:custom,user:new PublicKey(new Uint8Array(32).fill(12)),market:new PublicKey(new Uint8Array(32).fill(13)),
++ venue:Venue.PumpSwap,mode:TradeMode.ExactQuoteIn,amount:100n,limit:10n,pumpAccounts:[],
++ expectedConfigurationHash:new Uint8Array(32).fill(7),deadlineSlot:123n};
++describe('SENRO checked route builders',()=>{
++ it('encodes configuration commitment and signed slot expiry',()=>{
++  const ix=checkedRouteIx(base);expect(ix.data.length).toBe(65);
++  expect(ix.data.subarray(0,8)).toEqual(Buffer.from(ixDiscriminator('route_amm_checked')));
++  expect(ix.data.subarray(25,57)).toEqual(Buffer.from(base.expectedConfigurationHash));
++  expect(ix.data.readBigUInt64LE(57)).toBe(123n);
++ });
++ it('selects the checked curve entrypoint',()=>{
++  const ix=checkedRouteIx({...base,venue:Venue.BondingCurve});
++  expect(ix.data.subarray(0,8)).toEqual(Buffer.from(ixDiscriminator('route_curve_checked')));
++ });
++ it('refuses the original mainnet ID',()=>{
++  expect(()=>checkedRouteIx({...base,programId:PUMP_HOOKS_PROGRAM_ID})).toThrow(/upstream mainnet/);
++  expect(()=>readConfigurationHashIx({market:base.market,programId:PUMP_HOOKS_PROGRAM_ID})).toThrow(/upstream mainnet/);
++ });
++ it('refuses omitted, zero, negative and overflowing trade bounds',()=>{
++  for(const limit of [0n,-1n,1n<<64n])expect(()=>checkedRouteIx({...base,limit})).toThrow(/bound/);
++  expect(()=>checkedRouteIx({...base,deadlineSlot:0n})).toThrow(/deadline/);
++  expect(()=>checkedRouteIx({...base,amount:0n})).toThrow(/amount/);
++ });
++ it('requires the complete fingerprint',()=>{
++  expect(()=>checkedRouteIx({...base,expectedConfigurationHash:new Uint8Array(31)})).toThrow(/32 bytes/);
++ });
++ it('can construct the read-only fingerprint instruction without signer privileges',()=>{
++  const ix=readConfigurationHashIx({market:base.market,programId:custom,policyIndexes:[0,2]});
++  expect(ix.keys.length).toBe(3);expect(ix.keys.every(k=>!k.isSigner&&!k.isWritable)).toBe(true);
++ });
++});
+diff --git a/programs/pump-hooks/src/configuration.rs b/programs/pump-hooks/src/configuration.rs
+new file mode 100644
+index 0000000..4724829
+--- /dev/null
++++ b/programs/pump-hooks/src/configuration.rs
+@@ -0,0 +1,46 @@
++//! SENRO fork: commit to configuration, never to trade-mutated counters/state.
++use anchor_lang::{prelude::Pubkey,solana_program::hash::Hasher};
++use hook_types::{HookSlot,MAX_HOOK_SLOTS,MAX_POLICIES};
++use policy_vm::PolicyData;
++use crate::state::MarketConfig;
++
++pub fn fingerprint(market_key:&Pubkey,market:&MarketConfig,policies:&[PolicyData;MAX_POLICIES],mask:u8)->[u8;32]{
++    let mut config=*market;
++    config.routed_buy_quote=0;config.routed_sell_quote=0;config.trade_count=0;config.sequence=0;
++    let mut slots: [HookSlot;MAX_HOOK_SLOTS]=config.read_slots();
++    for slot in &mut slots {slot.state=[0;48];}
++    config.write_slots(&slots);
++    let mut h=Hasher::default();
++    h.hashv(&[b"senro:pump-configuration:v1",crate::ID.as_ref(),market_key.as_ref(),bytemuck::bytes_of(&config),&[mask]]);
++    for (index,p) in policies.iter().enumerate(){
++        if mask&(1<<index)==0 {continue;}
++        let mut policy=*p;
++        policy.registers=[0;4];policy.exec_count=0;policy.last_exec_ts=0;policy.intent=Default::default();
++        h.hashv(&[&[index as u8],bytemuck::bytes_of(&policy)]);
++    }
++    h.result().to_bytes()
++}
++
++#[cfg(test)] mod tests{
++    use super::*;
++    use bytemuck::Zeroable;
++    fn empty()->(MarketConfig,[PolicyData;MAX_POLICIES]){(MarketConfig::zeroed(),[PolicyData::zeroed();MAX_POLICIES])}
++    #[test]fn trade_counters_and_hook_state_do_not_invalidate_a_review(){
++        let(mut m,p)=empty();let key=Pubkey::new_unique();let before=fingerprint(&key,&m,&p,0);
++        m.sequence=10;m.trade_count=9;m.routed_buy_quote=99;m.routed_sell_quote=20;
++        let mut slots=m.read_slots();slots[0].state=[7;48];m.write_slots(&slots);
++        assert_eq!(before,fingerprint(&key,&m,&p,0));
++    }
++    #[test]fn rule_configuration_and_namespace_are_bound(){
++        let(mut m,p)=empty();let key=Pubkey::new_unique();let before=fingerprint(&key,&m,&p,0);
++        let mut slots=m.read_slots();slots[0].config[0]=1;m.write_slots(&slots);
++        assert_ne!(before,fingerprint(&key,&m,&p,0));
++        let(m,p)=empty();assert_ne!(fingerprint(&key,&m,&p,0),fingerprint(&Pubkey::new_unique(),&m,&p,0));
++    }
++    #[test]fn policy_counters_are_excluded_but_authored_actions_are_bound(){
++        let(m,mut p)=empty();let key=Pubkey::new_unique();let before=fingerprint(&key,&m,&p,1);
++        p[0].registers=[4;4];p[0].exec_count=7;p[0].last_exec_ts=42;p[0].intent.value=99;
++        assert_eq!(before,fingerprint(&key,&m,&p,1));
++        p[0].actions[0].value=10;assert_ne!(before,fingerprint(&key,&m,&p,1));
++    }
++}
+diff --git a/programs/pump-hooks/src/errors.rs b/programs/pump-hooks/src/errors.rs
+index d0d6fe5..ea84065 100644
+--- a/programs/pump-hooks/src/errors.rs
++++ b/programs/pump-hooks/src/errors.rs
+@@ -85,6 +85,14 @@ pub enum PumpHooksError {
+     SignalNotVerified,
+     #[msg("Signal rejected")]
+     SignalRejected,
++    #[msg("Rule configuration changed since review")]
++    ConfigurationChanged,
++    #[msg("The route's signed slot deadline has expired")]
++    RouteExpired,
++    #[msg("Checked routes require an explicit positive output/input bound")]
++    MissingTradeBound,
++    #[msg("Unexpected remaining accounts")]
++    UnexpectedRemainingAccounts,
+ }
+ 
+ impl From<HookError> for PumpHooksError {
+diff --git a/programs/pump-hooks/src/instructions/route.rs b/programs/pump-hooks/src/instructions/route.rs
+index 8f61323..0813a1a 100644
+--- a/programs/pump-hooks/src/instructions/route.rs
++++ b/programs/pump-hooks/src/instructions/route.rs
+@@ -198,7 +198,8 @@ fn new_work() -> Box<Work> {
+ /// Active policies follow the Pump block in the remaining accounts, one per mask bit, in index
+ /// order.
+ #[inline(never)]
+-fn load_policies<'a>(w: &mut Work, market_key: &Pubkey, extra: &'a [AccountInfo<'a>]) -> Result<()> {
++fn load_policies<'a>(w: &mut Work, market_key: &Pubkey, extra: &'a [AccountInfo<'a>], writable: bool) -> Result<()> {
++    require!(extra.len() == w.policy_mask.count_ones() as usize, E::UnexpectedRemainingAccounts);
+     let mut it = extra.iter();
+     for i in 0..MAX_POLICIES {
+         if w.policy_mask & (1 << i) == 0 {
+@@ -207,7 +208,7 @@ fn load_policies<'a>(w: &mut Work, market_key: &Pubkey, extra: &'a [AccountInfo<
+         let ai = it.next().ok_or(E::PolicyAccountMissing)?;
+         let expected = Pubkey::find_program_address(&[POLICY_SEED, market_key.as_ref(), &[i as u8]], &ID).0;
+         require_keys_eq!(ai.key(), expected, E::PolicyAccountMissing);
+-        require!(ai.is_writable, E::PolicyAccountMissing);
++        require!(!writable || ai.is_writable, E::PolicyAccountMissing);
+         w.policies[i] = AccountLoader::<Policy>::try_from(ai)?.load()?.read();
+     }
+     Ok(())
+@@ -370,7 +371,31 @@ fn observed(side: Side, pre: &Snapshot, post: &Snapshot, acc_rent: u64) -> Resul
+     }
+ }
+ 
++#[derive(Accounts)]
++pub struct ReadConfiguration<'info> {
++    pub market: AccountLoader<'info, MarketConfig>,
++}
++
++pub fn read_configuration_hash<'info>(ctx: Context<'_, '_, 'info, 'info, ReadConfiguration<'info>>) -> Result<()> {
++    let m=ctx.accounts.market.load()?;
++    let mut w=new_work();
++    w.policy_mask=m.read_slots().iter().find(|s|s.module_id==ModuleId::Policy as u16).map(|s|s.config[0]).unwrap_or(0);
++    load_policies(&mut w,&ctx.accounts.market.key(),ctx.remaining_accounts,false)?;
++    let hash=crate::configuration::fingerprint(&ctx.accounts.market.key(),&m,&w.policies,w.policy_mask);
++    anchor_lang::solana_program::program::set_return_data(&hash);
++    Ok(())
++}
++
+ pub fn route<'info>(ctx: Context<'_, '_, 'info, 'info, Route<'info>>, venue: Venue, mode: u8, amount: u64, limit: u64) -> Result<()> {
++    route_internal(ctx,venue,mode,amount,limit,None)
++}
++
++pub fn route_checked<'info>(ctx: Context<'_, '_, 'info, 'info, Route<'info>>, venue: Venue, mode: u8, amount: u64, limit: u64, hash:[u8;32], deadline:u64) -> Result<()> {
++    require!(limit>0,E::MissingTradeBound);
++    route_internal(ctx,venue,mode,amount,limit,Some((hash,deadline)))
++}
++
++fn route_internal<'info>(ctx: Context<'_, '_, 'info, 'info, Route<'info>>, venue: Venue, mode: u8, amount: u64, limit: u64, commitment:Option<([u8;32],u64)>) -> Result<()> {
+     let mode = Mode::from_u8(mode).ok_or(E::InvalidMode)?;
+     require!(amount > 0, E::ZeroAmount);
+     require!(!ctx.accounts.global.paused, E::ProtocolPaused);
+@@ -384,6 +409,7 @@ pub fn route<'info>(ctx: Context<'_, '_, 'info, 'info, Route<'info>>, venue: Ven
+     let market_key = ctx.accounts.market.key();
+     let user_key = ctx.accounts.user.key();
+     let clock = Clock::get()?;
++    if let Some((_,deadline))=commitment { require!(clock.slot<=deadline,E::RouteExpired); }
+     let disabled = ctx.accounts.global.disabled_modules;
+ 
+     // User state is created by the wallet's first routed trade.
+@@ -437,7 +463,11 @@ pub fn route<'info>(ctx: Context<'_, '_, 'info, 'info, Route<'info>>, venue: Ven
+     w.slots = m.read_slots();
+     w.policy_mask = w.slots.iter().find(|s| s.module_id == ModuleId::Policy as u16).map(|s| s.config[0]).unwrap_or(0);
+     w.stats = m.stats();
+-    load_policies(&mut w, &market_key, extra)?;
++    load_policies(&mut w, &market_key, extra, true)?;
++    if let Some((expected,_))=commitment {
++        let actual=crate::configuration::fingerprint(&market_key,&m,&w.policies,w.policy_mask);
++        require!(actual==expected,E::ConfigurationChanged);
++    }
+     let mut us = ctx.accounts.user_state.load_mut()?;
+     w.user = us.read();
+ 
+diff --git a/programs/pump-hooks/src/lib.rs b/programs/pump-hooks/src/lib.rs
+index 5f564e3..ba1e9a8 100644
+--- a/programs/pump-hooks/src/lib.rs
++++ b/programs/pump-hooks/src/lib.rs
+@@ -10,6 +10,7 @@
+ use anchor_lang::prelude::*;
+ 
+ pub mod errors;
++pub mod configuration;
+ pub mod events;
+ pub mod instructions;
+ pub mod state;
+@@ -99,6 +100,18 @@ pub mod pump_hooks {
+         route::route(ctx, Venue::BondingCurve, mode, amount, limit)
+     }
+ 
++    /// SENRO checked route: the caller commits to reviewed configuration and a slot expiry.
++    pub fn route_amm_checked<'info>(ctx: Context<'_, '_, 'info, 'info, Route<'info>>, mode: u8, amount: u64, limit: u64, expected_configuration_hash: [u8;32], deadline_slot: u64) -> Result<()> {
++        route::route_checked(ctx, Venue::PumpSwap, mode, amount, limit, expected_configuration_hash, deadline_slot)
++    }
++    pub fn route_curve_checked<'info>(ctx: Context<'_, '_, 'info, 'info, Route<'info>>, mode: u8, amount: u64, limit: u64, expected_configuration_hash: [u8;32], deadline_slot: u64) -> Result<()> {
++        route::route_checked(ctx, Venue::BondingCurve, mode, amount, limit, expected_configuration_hash, deadline_slot)
++    }
++    /// Read via transaction simulation; return-data is the 32-byte current config fingerprint.
++    pub fn read_configuration_hash<'info>(ctx: Context<'_, '_, 'info, 'info, ReadConfiguration<'info>>) -> Result<()> {
++        route::read_configuration_hash(ctx)
++    }
++
+     // ---- SENTIENT
+     pub fn submit_signal(ctx: Context<SubmitSignal>, signal: [u8; 96]) -> Result<()> {
+         signal::submit_signal(ctx, signal)

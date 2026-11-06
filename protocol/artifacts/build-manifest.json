@@ -1,0 +1,13 @@
+{
+  "scope": "local-test-only",
+  "rust": "1.99.1 host",
+  "cargoBuildSbf": "4.5.0",
+  "platformTools": "v1.57",
+  "files": {
+    "guard/src/lib.rs": "f352b2c73dfb542857c67e46b2d78ee51da38ec15a4a7718eb0396f91278d236",
+    "Cargo.lock": "6d993cbc3e35d879cd4aaf6baf61db291e2afcf4174b17688ba7acda58eef31a",
+    "artifacts/senro_guard.so": "3d94ce25b9449a44b3ecb6bbf4ced29a8a679436ba3f7484694282808e65398e",
+    "tests/fixtures/programs/pump_amm.so": "6a7ad34596d83b4c435b32f458a56e718e9f82eb4ad38e4316616d15d24d8ff7",
+    "tests/fixtures/programs/pump_fees.so": "4f2955d0f6b40cc9ff7daa18ccad7d19119ba1249759f4e7e3bb691beee6b35e"
+  }
+}

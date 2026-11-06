@@ -1,0 +1,11 @@
+[package]
+name = "senro-browser-guard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pump-next-route-guard = { path = "../route-guard" }

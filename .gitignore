@@ -1,0 +1,15 @@
+node_modules/
+dist/
+engine/target/
+protocol/target/
+.sites-runtime/
+.openai/
+.env
+.env.*
+!.env.example
+*.log
+*.so
+**/*keypair*.json
+.DS_Store
+__pycache__/
+*.py[cod]
