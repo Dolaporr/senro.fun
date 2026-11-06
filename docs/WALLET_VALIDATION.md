@@ -38,3 +38,17 @@ The ChatGPT Site and Netlify deployment are separate. Updating one does not esta
 The connection panel is a right-aligned glass dialog with a separate read-only address form. Installed providers are detected through the existing Wallet Standard registry; their own inline data-image logos are displayed with a monogram fallback. No uninstalled provider is presented as a working connection. SENRO uses an original SVG icon family for navigation, rules, balances, network settings and wallet connection.
 
 Browser QA checked opening the panel, focus placement, expanding read-only access, the disabled empty-submit state and rejection of invalid addresses. Actual provider logo rendering, connection and signing in a real extension still require the user's browser. The 70 regression tests and production build pass; trading remains disabled.
+
+## Mobile browser handoff — 6 November 2026
+
+The iPhone browser test exposed a missing entry path: installed wallet apps are not enumerated by Wallet Standard in an ordinary phone browser. The connection panel now offers explicit **Open in Phantom** and **Open in Solflare** links when no in-browser provider is registered. They use the wallets' documented universal browse links, with locally hosted brand assets and preserved license notices.
+
+The wallet opens SENRO at `?connectWallet=1#studio`. The hint opens the connection panel and is removed from browser history; it never automatically calls connect, signs, or treats a URL as proof of an account. Existing Wallet Standard connection/session validation remains unchanged. The target keeps the same app origin and path but strips arbitrary query strings, hashes, RPC credentials and addresses. No attempt is made to infer which apps are installed. The app must still be approved in the wallet browser.
+
+Another-wallet help provides a copyable link and manual Browser/Discover instructions. If clipboard permission is unavailable, the UI shows manual-copy guidance. Drafts and named rule sets are browser-local and are not silently transferred. The panel says to review limits again after switching browsers.
+
+Verification: **80 JavaScript tests pass**, including URL encoding, same-origin targeting, credential/query stripping, unsafe-scheme rejection, one-time UI hints and mobile/iPad detection. A real 390px CSS iframe review confirmed both locally hosted wallet logos and links, the connection panel after handoff, and manual-copy feedback when iframe clipboard access is denied. This is not an actual iPhone app-switch test. Actual wallet opening, provider registration, approval/rejection, account switching and signing still require a real phone.
+
+References:
+- https://docs.phantom.com/phantom-deeplinks/other-methods/browse
+- https://docs.solflare.com/solflare/technical/deeplinks/other-methods/browse

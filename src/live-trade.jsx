@@ -1,5 +1,6 @@
 import {SenroIcon} from './senro-icons.jsx';
 import {WalletPanel} from './wallet-panel.jsx';
+import {consumeWalletHandoff} from './mobile-wallet.mjs';
 import {createWalletSession,selectMainnetAccount,walletCapabilities} from './wallet-session.mjs';
 import {createWalletChallenge,checkWalletMessage} from './wallet-check.mjs';
 import {Connection} from '@solana/web3.js';
@@ -23,6 +24,7 @@ export function useLiveTrade({config,revision}){
  const guardEnabled=deploymentReady(GUARD_DEPLOYMENT);
  const walletRef=useRef(null),offWallet=useRef(null),generation=useRef(0),lookupGeneration=useRef(0);
  const inputKey=JSON.stringify([mode,revision,config,market?.mint,account?.address,rpc,amount,slippage,nativeBound]);const currentKey=useRef(inputKey);currentKey.current=inputKey;
+ useEffect(()=>{const handoff=consumeWalletHandoff(location.href);if(handoff.open){setWalletDialog(true);window.history.replaceState(window.history.state,'',handoff.cleanPath);}},[]);
  useEffect(()=>{const api=getWallets(),refresh=()=>{const all=api.get();setWallets(all.filter(w=>w.chains.some(c=>c.startsWith('solana:'))&&w.features['standard:connect']));if(walletRef.current&&!all.includes(walletRef.current))clearWallet();};refresh();const off1=api.on('register',refresh),off2=api.on('unregister',refresh);return()=>{off1();off2();offWallet.current?.();session.invalidate();connectionEpoch.current++;generation.current++;probeEpoch.current++;};},[]);
  useEffect(()=>{generation.current++;setResult(null);setError('');setBusy(false);},[inputKey]);
  useEffect(()=>{if(!result)return;setNow(Date.now());const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[result]);
