@@ -474,6 +474,7 @@ fn browser_wire(
         .as_ref()
         .map(|a| base64::engine::general_purpose::STANDARD.encode(&a.data));
     let input = serde_json::json!({
+        "programId": ID.to_string(),
         "testUserSecret": e.user.to_bytes().to_vec(),
         "slot": clock.slot,
         "blockhash": e.svm.latest_blockhash().to_string(),

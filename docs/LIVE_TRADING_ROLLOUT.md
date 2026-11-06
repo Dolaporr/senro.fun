@@ -10,7 +10,7 @@ The owner tested Solflare on iPhone and supplied screenshots/results for: openin
 
 Start with a wallet-owned SOL trade cap around canonical SOL PumpSwap buys. `requireSupportedDraft` already rejects rolling-volume, sell-cooldown and account-cap rules in this guarded flow. Keep those restrictions until their on-chain implementations and runtime tests exist. Successful venue simulation is not sufficient to activate the guard.
 
-The Rust program rejects calls when its runtime program ID differs from its compiled `ID`. Its present constant `[83; 32]` is deliberately a test identity. Deploying the archived ELF under a new public key will not solve this: choose a deployment identity, compile that identity into the final source, and rerun the runtime tests and hash vectors. Do not simply set `enabled:true` or reuse test executable hashes.
+The Rust program rejects calls when its runtime program ID differs from its compiled `ID`. The owner has now selected `E1e4396v1CB8ttJ8FoBLN23Acfi25auiMabqpPjBgAwU`; the source and runtime bridge bind that candidate. The earlier `[83; 32]` identity and its archived ELF remain historical test evidence. A fresh candidate SBF build and runtime suite are still required. Do not simply set `enabled:true`, deploy the archived ELF under the new address, or reuse test executable hashes. See `protocol/CANDIDATE_IDENTITY.md`.
 
 ## Execution order
 

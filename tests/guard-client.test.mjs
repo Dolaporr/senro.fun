@@ -13,3 +13,14 @@ test('policy writes require explicit program identity, positive bounds and revis
 
 test('atomic instruction adapter preserves setup and cleanup around exactly one guarded venue call',()=>{const p=params(),before=new TransactionInstruction({programId:key(60),keys:[],data:Buffer.from([1])}),after=new TransactionInstruction({programId:key(61),keys:[],data:Buffer.from([2])}),instructions=[before,p.venueInstruction,after];const adapted=guardPumpSwapInstructions({...p,instructions});assert.equal(adapted[0],before);assert.equal(adapted[2],after);assert.ok(adapted[1].programId.equals(LOCAL_PROGRAM_ID));assert.ok(instructions[1].programId.equals(PUMP_AMM_PROGRAM_ID));});
 test('atomic adapter refuses missing or multiple venue calls',()=>{const p=params();assert.throws(()=>guardPumpSwapInstructions({...p,instructions:[]}));assert.throws(()=>guardPumpSwapInstructions({...p,instructions:[p.venueInstruction,p.venueInstruction]}));});
+
+// The legacy vector remains above; this is the new Rust/client candidate vector.
+test('candidate identity has its own policy fingerprint and binds the program address',async()=>{
+ const {CANDIDATE_PROGRAM_ID}=await import('../protocol/client/program-id.mjs');
+ assert.equal(CANDIDATE_PROGRAM_ID.toBase58(),'E1e4396v1CB8ttJ8FoBLN23Acfi25auiMabqpPjBgAwU');
+ const expected='20674d5a00354e0bfdbfbe39b5fdf42b6e0eca989dd5617c398a1d548c8eb7f6';
+ assert.equal(Buffer.from(policyFingerprint(policy,CANDIDATE_PROGRAM_ID)).toString('hex'),expected);
+ assert.notEqual(Buffer.from(policyFingerprint(policy,LOCAL_PROGRAM_ID)).toString('hex'),expected);
+ const ix=guardedBuyInstruction({...params(),programId:CANDIDATE_PROGRAM_ID,policyAddress:policyAddress({programId:CANDIDATE_PROGRAM_ID,...policy})[0]});
+ assert.ok(ix.programId.equals(CANDIDATE_PROGRAM_ID));
+});

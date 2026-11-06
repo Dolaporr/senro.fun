@@ -1,4 +1,4 @@
-//! Local-only SENRO PumpSwap SOL-buy guard. No deployment is implied by this program ID.
+//! SENRO PumpSwap SOL-buy guard. Candidate identity only; deployment is not implied.
 use pump_adapter::{
     accounts::amm_v2 as a,
     ix::{amm_v2_data, Mode},
@@ -19,7 +19,11 @@ use solana_program::{
     sysvar::Sysvar,
 };
 
-pub const ID: Pubkey = Pubkey::new_from_array([83; 32]);
+// Candidate identity: E1e4396v1CB8ttJ8FoBLN23Acfi25auiMabqpPjBgAwU
+pub const ID: Pubkey = Pubkey::new_from_array([
+    193, 81, 211, 69, 137, 184, 123, 227, 150, 157, 191, 173, 10, 105, 16, 241,
+    143, 100, 196, 19, 188, 102, 252, 216, 17, 94, 89, 186, 228, 179, 188, 147,
+]);
 pub const POLICY_LEN: usize = 8 + 32 * 4 + 8 * 3 + 2;
 pub const MAX_VALIDITY_SLOTS: u64 = 150;
 const MAGIC: &[u8; 8] = b"SENROP01";
@@ -507,11 +511,17 @@ mod tests {
             bump: 0,
             active: true,
         };
-        let expected = [
+        let legacy_expected = [
             0x7b, 0x06, 0x77, 0xa3, 0xa4, 0x9f, 0x20, 0x45, 0xb9, 0x91, 0xc7, 0xef, 0xba, 0xab,
             0xe7, 0xa6, 0xd3, 0x1c, 0x6d, 0x6c, 0x5f, 0x83, 0x0b, 0xf0, 0xf4, 0xe0, 0x7e, 0x2a,
             0xf3, 0x11, 0x40, 0x81,
         ];
+        let expected = [
+            0x20, 0x67, 0x4d, 0x5a, 0x00, 0x35, 0x4e, 0x0b, 0xfd, 0xbf, 0xbe, 0x39, 0xb5, 0xfd, 0xf4, 0x2b,
+            0x6e, 0x0e, 0xca, 0x98, 0x9d, 0xd5, 0x61, 0x7c, 0x39, 0x8a, 0x1d, 0x54, 0x8c, 0x8e, 0xb7, 0xf6,
+        ];
+        assert_eq!(p.fingerprint(&Pubkey::new_from_array([83; 32])), legacy_expected);
+        assert_ne!(expected, legacy_expected);
         assert_eq!(p.fingerprint(&ID), expected);
         p.nonce = 9;
         assert_eq!(p.fingerprint(&ID), expected);
