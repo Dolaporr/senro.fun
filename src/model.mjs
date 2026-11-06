@@ -1,4 +1,4 @@
-import { parseAmount } from './policy-client.mjs';
+import { parseAmount, U64_MAX, u64 } from './policy-client.mjs';
 export const DEFAULT_CONFIG = Object.freeze({cap:'0.20',rolling:'0.80',minutes:'60',cooldown:'30',account:'1000000',
   capOn:true,rollingOn:true,cooldownOn:true,accountOn:false,quote:'SOL',token:'WIF'});
 export const QUOTES={SOL:{decimals:9,label:'SOL'},USDC:{decimals:6,label:'USDC'}};
@@ -8,7 +8,7 @@ export function quantities(c) {
   const positive=(s,n)=>{const v=parseAmount(s,n);if(v===0n)throw new Error('Enabled limits must be above zero.');return v;};
   const integer=s=>{if(!/^\d+$/.test(s))throw new Error('Time limits use whole numbers.');return positive(s,0);};
   return {cap:c.capOn?positive(c.cap,d):0n,rolling:c.rollingOn?positive(c.rolling,d):0n,
-    window:c.rollingOn?integer(c.minutes)*60n:60n,cooldown:c.cooldownOn?integer(c.cooldown):0n,
+    window:c.rollingOn?u64(integer(c.minutes)*60n+1000n,'Time window')-1000n:60n,cooldown:c.cooldownOn?integer(c.cooldown):0n,
     account:c.accountOn?positive(c.account,6):0n,decimals:d};
 }
 export function makePolicy(c,revision) {
@@ -29,10 +29,14 @@ export function makeCases(engine,c){
   if(q.rolling>0n&&small>q.rolling/4n)small=q.rolling/4n;
   if(small<1n)small=1n;
   const cases=[{key:'normal',name:'Inside the limits',detail:'A single routed trade using synthetic balances.',amount:small,scenario:0,expected:0}];
-  if(c.capOn)cases.push({key:'size',name:'Above the trade cap',detail:'A fill 25% above the configured quote cap.',amount:q.cap+q.cap/4n+1n,scenario:0,expected:1});
-  if(c.rollingOn)cases.push({key:'window',name:'Across the window boundary',detail:'Recent fills stay in the window when its first observation expires.',amount:small,scenario:1,expected:2});
-  if(c.cooldownOn)cases.push({key:'cooldown',name:'A second sell after 10s',detail:'Two synthetic sells with a ten-second gap.',amount:small,scenario:2,expected:q.cooldown>10n?3:0});
-  if(c.accountOn)cases.push({key:'balance',name:'A fill above the balance cap',detail:'The observed post-trade account balance exceeds its cap.',amount:small,scenario:3,expected:4});
+  if(c.capOn&&q.cap<U64_MAX)cases.push({key:'size',name:'Above the trade cap',detail:'A synthetic fill above the configured quote cap.',amount:q.cap+q.cap/4n+1n>U64_MAX?U64_MAX:q.cap+q.cap/4n+1n,scenario:0,expected:1});
+  if(c.rollingOn){
+    const chunks=q.rolling>1n?(q.cap>0n?(q.rolling-1n+q.cap-1n)/q.cap:1n):0n;
+    const full=chunks+1n>64n;
+    cases.push({key:'window',name:full?'History reaches capacity':'Across the window boundary',detail:full?'This draft needs more than 64 live observations to fill the window. The core rejects new history instead of dropping existing volume.':'The first fill expires; the remaining fills still count. A one-unit trade may fit exactly at the limit.',amount:small,scenario:1,expected:full?8:small>1n?2:0});
+  }
+  if(c.cooldownOn)cases.push({key:'cooldown',name:'A second sell after 10s',detail:'Two synthetic sells with a ten-second gap.',amount:small,scenario:2,expected:q.cooldown>10n?3:q.rolling>0n&&small*2n>q.rolling?2:0});
+  if(c.accountOn&&q.account<U64_MAX)cases.push({key:'balance',name:'A fill above the balance cap',detail:'The observed post-trade account balance exceeds its cap.',amount:small,scenario:3,expected:4});
   cases.push({key:'version',name:'Rules changed after review',detail:'The reviewed policy fingerprint is changed before execution.',amount:small,scenario:4,expected:6});
   cases.push({key:'expiry',name:'An expired trade intent',detail:'Execution happens after its signed slot deadline.',amount:small,scenario:5,expected:7});
   return cases.map(r=>{const code=evaluate(engine,c,r.amount,r.scenario);return {...r,code,matched:code===r.expected,allowed:code===0,reason:REASONS[code]??REASONS[10]};});
