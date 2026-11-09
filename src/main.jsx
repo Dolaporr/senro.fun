@@ -9,11 +9,12 @@ import './style.css';
 import './studio-glass.css';
 import {SenroIcon} from './senro-icons.jsx';
 import {Landing} from './landing.jsx';
-import {FlowField} from './flow-field.jsx';
+import {TradeScene} from './trade-scene.jsx';
 import {loadSnapshots,saveSnapshots} from './saved-rules.mjs';
 import {useLiveTrade,SimulationModes,LiveMarket,LiveBench,LiveDialogs,LiveActivity,GuardedBench} from './live-trade.jsx';
 import {shortAddress} from './live-chain.mjs';
 import './interaction-polish.css';
+import './checkpoint-theme.css';
 
 const spring={type:'spring',stiffness:330,damping:32};
 const RULES=[{id:'cap',label:'Trade size',field:'cap',toggle:'capOn',unit:'quote',description:'Set the largest amount allowed for one trade.'},
@@ -87,7 +88,7 @@ function App(){
   </motion.header>
   <AnimatePresence mode="wait"><motion.main key={view} variants={pageVariants} initial="hidden" animate="show" exit="exit" transition={{duration:.3}}>
   {view==='landing'?<Landing engine={engine} engineError={engineError} onOpen={()=>setView('studio')}/>:view==='studio'?<>
-   <div className="studio-intro"><FlowField/><div className="intro-copy"><span className="intro-eyebrow"><span/> THE RULE STUDIO</span><h1>Your trade.<br/>Your terms<span className="heading-period">.</span></h1><p>Choose a token, set your limits, and preview a buy.</p></div><div className="intro-foot"><span><ShieldCheck size={13}/> Test your rules before spending funds.</span><span className="intro-number">SENRO / 001</span></div></div>
+   <div className="studio-intro"><TradeScene compact paused state={live.mode!=='checks'||customResult===null?'pending':customResult===0?'pass':'block'}/><div className="intro-copy"><span className="intro-eyebrow"><span/> THE RULE STUDIO</span><h1>Make your<br/>own rules<span className="heading-period">.</span></h1><p>Choose a token, set your limits, and preview a buy.</p></div><div className="intro-foot"><span><ShieldCheck size={13}/> Test your rules before spending funds.</span><span className="intro-number">SENRO / 001</span></div></div>
    <div className="studio-toolbar"><div className="workspace-label"><span className="workspace-dot"/>Your workspace <span className="toolbar-divider"/> <span>Draft v{String(revision).padStart(2,'0')}</span></div><SimulationModes live={live}/></div>
    {!live.guardEnabled&&<aside className="studio-preview-note" aria-label="Preview status"><Info size={15}/><p><strong>Preview only.</strong> Checks and buy previews do not spend funds. Live trading is unavailable.</p></aside>}
    <div className="workspace">
