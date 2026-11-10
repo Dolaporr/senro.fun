@@ -10,7 +10,7 @@ export function ParticleBackdrop({paused=false}){
   let width=0,height=0,frame=0,lastFrame=0,disposed=false,touch=null;
   const pointer={x:0,y:0,targetX:0,targetY:0,movedAt:-Infinity},trail=[],bursts=[];
   const still=paused||reduced,now=()=>performance.now()/1000;
-  function hoverStrength(t){const age=t-pointer.movedAt;return age<.12?1:Math.max(0,1-(age-.12)/.95)**2;}
+  function hoverStrength(t){if(touch)return 1;const age=t-pointer.movedAt;return age<.12?1:Math.max(0,1-(age-.12)/.95)**2;}
   function glow(x,y,radius,alpha){
    if(alpha<.001)return;
    const gradient=ctx.createRadialGradient(x,y,0,x,y,radius);
@@ -80,27 +80,39 @@ export function ParticleBackdrop({paused=false}){
   }
   function burstAt(x,y){bursts.push({x,y,time:now()});if(bursts.length>4)bursts.shift();wake();}
   function down(event){
-   if(still||event.isPrimary===false||event.button!==0)return;
-   if(event.pointerType==='touch'){touch={id:event.pointerId,x:event.clientX,y:event.clientY,time:now()};return;}
+   if(still||event.pointerType==='touch'||event.isPrimary===false||event.button!==0)return;
    move(event);burstAt(event.clientX,event.clientY);
   }
-  function up(event){
-   if(event.pointerType!=='touch'||!touch||touch.id!==event.pointerId)return;
-   const tap=touch;touch=null;
-   if(!still&&now()-tap.time<.75&&Math.hypot(event.clientX-tap.x,event.clientY-tap.y)<14)burstAt(event.clientX,event.clientY);
+  // Touch events continue during native scrolling after pointer events are cancelled.
+  // Passive listeners keep the browser's normal scrolling and zooming behaviour.
+  function touchStart(event){
+   if(still||touch)return;
+   const finger=event.changedTouches[0];if(!finger)return;
+   touch={id:finger.identifier};
+   move({clientX:finger.clientX,clientY:finger.clientY});
+   burstAt(finger.clientX,finger.clientY);
   }
-  function cancel(){touch=null;}
-  function out(event){if(!event.relatedTarget){pointer.movedAt=-Infinity;trail.length=0;wake();}}
+  function touchMove(event){
+   if(!touch||still)return;
+   const finger=Array.from(event.touches).find(f=>f.identifier===touch.id);
+   if(finger)move({clientX:finger.clientX,clientY:finger.clientY});
+  }
+  function touchEnd(event){
+   if(!touch||!Array.from(event.changedTouches).some(f=>f.identifier===touch.id))return;
+   touch=null;pointer.movedAt=now();wake();
+  }
+  function out(event){if(event.pointerType!=='touch'&&!touch&&!event.relatedTarget){pointer.movedAt=-Infinity;trail.length=0;wake();}}
   function visibility(){
    cancelAnimationFrame(frame);frame=0;touch=null;pointer.movedAt=-Infinity;trail.length=0;bursts.length=0;
    if(!document.hidden)draw(now());
   }
   resize();
   window.addEventListener('resize',resize,{passive:true});window.addEventListener('pointermove',move,{passive:true});
-  window.addEventListener('pointerdown',down,{passive:true});window.addEventListener('pointerup',up,{passive:true});
-  window.addEventListener('pointercancel',cancel,{passive:true});window.addEventListener('pointerout',out,{passive:true});
+  window.addEventListener('pointerdown',down,{passive:true});window.addEventListener('pointerout',out,{passive:true});
+  window.addEventListener('touchstart',touchStart,{passive:true});window.addEventListener('touchmove',touchMove,{passive:true});
+  window.addEventListener('touchend',touchEnd,{passive:true});window.addEventListener('touchcancel',touchEnd,{passive:true});
   document.addEventListener('visibilitychange',visibility);
-  return()=>{disposed=true;cancelAnimationFrame(frame);window.removeEventListener('resize',resize);window.removeEventListener('pointermove',move);window.removeEventListener('pointerdown',down);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',cancel);window.removeEventListener('pointerout',out);document.removeEventListener('visibilitychange',visibility);};
+  return()=>{disposed=true;cancelAnimationFrame(frame);window.removeEventListener('resize',resize);window.removeEventListener('pointermove',move);window.removeEventListener('pointerdown',down);window.removeEventListener('touchstart',touchStart);window.removeEventListener('touchmove',touchMove);window.removeEventListener('touchend',touchEnd);window.removeEventListener('touchcancel',touchEnd);window.removeEventListener('pointerout',out);document.removeEventListener('visibilitychange',visibility);};
  },[paused,reduced]);
  return <div className="particle-backdrop" aria-hidden="true"><canvas ref={canvasRef} data-motion={paused||reduced?'paused':'interactive'}/></div>;
 }
