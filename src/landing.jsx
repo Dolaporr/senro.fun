@@ -25,7 +25,7 @@ export function Landing({engine,engineError,onOpen,backgroundPaused,onToggleBack
   <section className="landing-hero" aria-labelledby="landing-title">
    <motion.div className="landing-hero-copy" initial={{opacity:0,y:reduced?0:20}} animate={{opacity:1,y:0}} transition={{duration:.65}}>
     <span className="landing-kicker"><i/> SOLANA TRADING, WITH INTENTION</span>
-    <h1 id="landing-title">Every trade.<br/>On <span>your terms.</span></h1>
+    <h1 id="landing-title">Every trade.<br/><span>On your terms.</span></h1>
     <p>Set your limits. Test the outcome. Preview a Solana token buy before you make your move.</p>
     <div className="landing-hero-actions"><button className="landing-primary" onClick={onOpen}>Enter the studio<ArrowUpRight size={19}/></button><button className="landing-secondary" onClick={scrollToDemo}>Try it first<ArrowDown size={16}/></button></div>
     <span className="landing-release"><i/> PREVIEW RELEASE <span/> No funds moved.</span>
