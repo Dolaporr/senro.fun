@@ -16,6 +16,7 @@ import {shortAddress} from './live-chain.mjs';
 import './interaction-polish.css';
 import './checkpoint-theme.css';
 import './particle-finish.css';
+import './landing-details.css';
 
 const spring={type:'spring',stiffness:330,damping:32};
 const RULES=[{id:'cap',label:'Trade size',field:'cap',toggle:'capOn',unit:'quote',description:'Set the largest amount allowed for one trade.'},
@@ -83,9 +84,9 @@ function App(){
  let customResult=null;try{if(engine)customResult=evaluate(engine,config,parseAmount(testAmount,QUOTES[config.quote].decimals));}catch{}
  const pageVariants={hidden:{opacity:0,y:12},show:{opacity:1,y:0},exit:{opacity:0,y:-8}};
  return <MotionConfig reducedMotion="user"><div className="app-shell glass-studio"><ParticleBackdrop paused={backgroundPaused}/>
-  <motion.header className="topbar" initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} transition={{duration:.5}}>
+  <motion.header className={`topbar ${view==='landing'?'landing-topbar':''}`} initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} transition={{duration:.5}}>
    <button className="brand" onClick={()=>setView('landing')} aria-label="SENRO home"><Mark/><span>SENRO</span></button>
-   {view==='landing'?<nav className="main-nav landing-nav" aria-label="Main navigation"><button onClick={()=>window.scrollTo({top:0,behavior:reduced?'auto':'smooth'})}>Overview</button><button onClick={()=>document.getElementById('how-it-works')?.scrollIntoView({behavior:reduced?'auto':'smooth'})}>How it works</button><button onClick={()=>document.getElementById('questions')?.scrollIntoView({behavior:reduced?'auto':'smooth'})}>Questions</button></nav>:<nav className="main-nav" aria-label="Main navigation">{[['studio','Studio'],['rules','Rule sets'],['activity','Activity']].map(([id,label])=><button key={id} onClick={()=>setView(id)} className={view===id?'selected':''}><SenroIcon name={id==='rules'?'rules':id==='activity'?'activity':'studio'} size={15}/>{label}{view===id&&<motion.i layoutId="nav-line" transition={spring}/>}</button>)}</nav>}
+   {view==='landing'?<nav className="main-nav landing-nav" aria-label="Main navigation"><button onClick={()=>window.scrollTo({top:0,behavior:reduced?'auto':'smooth'})}>Overview</button><button onClick={()=>document.getElementById('how-it-works')?.scrollIntoView({behavior:reduced?'auto':'smooth'})}>How it works</button><button onClick={()=>document.getElementById('landing-examples')?.scrollIntoView({behavior:reduced?'auto':'smooth'})}>Examples</button><button onClick={()=>document.getElementById('questions')?.scrollIntoView({behavior:reduced?'auto':'smooth'})}>Questions</button></nav>:<nav className="main-nav" aria-label="Main navigation">{[['studio','Studio'],['rules','Rule sets'],['activity','Activity']].map(([id,label])=><button key={id} onClick={()=>setView(id)} className={view===id?'selected':''}><SenroIcon name={id==='rules'?'rules':id==='activity'?'activity':'studio'} size={15}/>{label}{view===id&&<motion.i layoutId="nav-line" transition={spring}/>}</button>)}</nav>}
    <div className="header-actions">{view==='landing'?<button className="landing-header-cta" onClick={()=>setView('studio')}>Open studio<ArrowUpRight size={14}/></button>:<><button className="build-status" onClick={()=>setModal('status')}><span className={engine?'status-dot ready':'status-dot'}/><span>{live.guardEnabled?'Guarded trading':'Preview only'}</span><Info size={13}/></button><button className="wallet-button" onClick={()=>live.setWalletDialog(true)}><SenroIcon name={live.account?'connection':'wallet'} size={17}/>{live.account?shortAddress(live.account.address):'Connect wallet'}</button></>}</div>
   </motion.header>
   <AnimatePresence mode="wait"><motion.main key={view} variants={pageVariants} initial="hidden" animate="show" exit="exit" transition={{duration:.3}}>
