@@ -70,3 +70,13 @@
  z-index:-2;
  filter:brightness(.64);
 }
+
+/* Reveal each screen once, keeping the full-width landscapes in place. */
+@media(prefers-reduced-motion:no-preference){
+ .landing-page > section[data-reveal] > * {
+  transition:opacity .8s cubic-bezier(.16,1,.3,1) var(--reveal-delay,120ms);
+ }
+ .landing-page > section[data-reveal="pending"] > * { opacity:0;transition:none; }
+ .landing-page > section[data-reveal="visible"] > * { opacity:1; }
+ .landing-page > section[data-reveal="focused"] > * { opacity:1;transition:none; }
+}

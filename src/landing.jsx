@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import {motion,useReducedMotion} from 'framer-motion';
 import {ArrowRight,ArrowUpRight,ArrowDown,ChevronDown,Check,Minus,Pause,Play,SlidersHorizontal,RotateCcw} from 'lucide-react';
 import {SenroIcon} from './senro-icons.jsx';
@@ -14,7 +14,28 @@ const MODES=[
  {id:'account',icon:'balance',title:'Token balance',label:'Maximum token balance',value:'1000000',unit:'TOKENS',scenario:3,description:'Decide how much is enough.',detail:'Synthetic account balances exceed the chosen token cap. This tests the post-trade balance rule.'}
 ];
 export function Landing({engine,engineError,onOpen,backgroundPaused,onToggleBackground}){
+ const pageRef=useRef(null);
  const [amount,setAmount]=useState('0.10'),[selected,setSelected]=useState('cap'),[walkStep,setWalkStep]=useState(0),[limits,setLimits]=useState(Object.fromEntries(MODES.map(m=>[m.id,m.value]))),reduced=useReducedMotion();
+ useEffect(()=>{
+  const page=pageRef.current;
+  if(reduced||!page||!('IntersectionObserver' in window))return;
+  const sections=[...page.querySelectorAll(':scope > section:not(.landing-hero)')];
+  const reveal=section=>{section.dataset.reveal='visible';observer.unobserve(section);};
+  const observer=new IntersectionObserver(entries=>{
+   entries.forEach(entry=>{if(entry.isIntersecting)reveal(entry.target);});
+  },{threshold:.06,rootMargin:'0px 0px -32px 0px'});
+  sections.forEach(section=>{
+   [...section.children].forEach((child,index)=>child.style.setProperty('--reveal-delay',`${120+Math.min(index,2)*100}ms`));
+   section.dataset.reveal='pending';
+   observer.observe(section);
+  });
+  const onFocus=event=>{
+   const section=event.target.closest('[data-reveal="pending"]');
+   if(section){section.dataset.reveal='focused';observer.unobserve(section);}
+  };
+  page.addEventListener('focusin',onFocus);
+  return ()=>{observer.disconnect();page.removeEventListener('focusin',onFocus);sections.forEach(section=>delete section.dataset.reveal);};
+ },[reduced]);
  const rule=MODES.find(m=>m.id===selected);
  const cfg={...DEFAULT_CONFIG,capOn:selected==='cap',rollingOn:selected==='rolling',cooldownOn:selected==='cooldown',accountOn:selected==='account',...limits};
  let outcome=null,error='';try{const parsed=parseAmount(amount,9);if(parsed===0n)error='Enter an amount above zero.';else if(engine)outcome=evaluate(engine,cfg,parsed,rule.scenario);}catch{error='Use a positive amount and a valid rule limit.';}
@@ -23,7 +44,7 @@ export function Landing({engine,engineError,onOpen,backgroundPaused,onToggleBack
  const scrollToDemo=()=>{document.getElementById('landing-demo')?.scrollIntoView({behavior:reduced?'auto':'smooth',block:'center'});document.getElementById('landing-amount')?.focus({preventScroll:true});};
  function loadExample(mode,value,limit){setSelected(mode);setAmount(value);setLimits(v=>({...v,[mode]:limit}));scrollToDemo();}
  function reset(){setAmount('0.10');setSelected('cap');setLimits(Object.fromEntries(MODES.map(m=>[m.id,m.value])));}
- return <div className="landing-page">
+ return <div className="landing-page" ref={pageRef}>
   <section className="landing-hero" aria-labelledby="landing-title">
    {!reduced && !backgroundPaused && <video className="meadow-film" src="/nature/hero.mp4" poster="/nature/hero.webp" autoPlay muted playsInline loop aria-hidden="true"/>}
    <div className="limit-field" data-paused={backgroundPaused||reduced} aria-hidden="true">
@@ -39,7 +60,7 @@ export function Landing({engine,engineError,onOpen,backgroundPaused,onToggleBack
      <rect x="647" y="30" width="2" height="165" fill="url(#field-edge)"/>
     </svg>
    </div>
-   <motion.div className="landing-hero-copy" initial={{opacity:0,y:reduced?0:20}} animate={{opacity:1,y:0}} transition={{duration:.65}}>
+   <motion.div className="landing-hero-copy" initial={reduced?false:{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:.8,delay:reduced?0:.18,ease:[.16,1,.3,1]}}>
     <span className="landing-kicker"><i/> SOLANA TRADING, WITH INTENTION</span>
     <h1 id="landing-title">Every trade.<br/><span>On your terms.</span></h1>
     <p>Set your limits. Test the outcome. Preview a Solana token buy before you make your move.</p>
