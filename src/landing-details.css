@@ -28,3 +28,32 @@
 .cap-example label { display:grid; grid-template-columns:1fr auto; gap:.65rem; align-items:center; }
 .cap-example input { grid-column:1/-1; width:100%; accent-color:#bde971; }
 .cap-example output { display:block; margin-top:.5rem; font-size:.85rem; }
+
+/* Each section uses a still from the same grassland series. */
+.landing-page > section {
+ position:relative;
+ isolation:isolate;
+}
+.landing-page > section::before {
+ content:"";
+ position:absolute;
+ inset:0;
+ z-index:-2;
+ pointer-events:none;
+ border-radius:inherit;
+ background-image:linear-gradient(90deg,rgba(3,8,5,.86),rgba(3,8,5,.52)),var(--landscape);
+ background-position:center;
+ background-size:cover;
+ opacity:.84;
+}
+.landing-hero { --landscape:url('/nature/hero.webp'); }
+.landing-page > .landing-hero::before {
+ background-image:linear-gradient(180deg,#03070363 0%,#03070380 48%,#03070318 84%,#03070399 100%),var(--landscape);
+}
+.landing-purpose { --landscape:url('/nature/overview.webp'); }
+.landing-demo { --landscape:url('/nature/playground.webp'); }
+.landing-boundaries { --landscape:url('/nature/boundaries.webp'); }
+.landing-how { --landscape:url('/nature/walkthrough.webp'); }
+.landing-scenarios { --landscape:url('/nature/examples.webp'); }
+.landing-questions { --landscape:url('/nature/questions.webp'); }
+.landing-bottom-cta { --landscape:url('/nature/closing.webp'); }
