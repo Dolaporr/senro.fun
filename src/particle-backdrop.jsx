@@ -1,7 +1,7 @@
 import React,{useEffect,useRef} from 'react';
 import {useReducedMotion} from 'framer-motion';
 
-/** A continuous aurora current, with a fading cursor trail and touch pulses. */
+/** Pointer light and touch ripples, including during native scrolling. */
 export function ParticleBackdrop({paused=false}){
  const canvasRef=useRef(null),reduced=useReducedMotion();
  useEffect(()=>{
@@ -19,27 +19,8 @@ export function ParticleBackdrop({paused=false}){
    gradient.addColorStop(1,'rgba(70,100,0,0)');
    ctx.fillStyle=gradient;ctx.fillRect(x-radius,y-radius,radius*2,radius*2);
   }
-  function aurora(t){
-   const phase=still?0:t*.32,lines=width<600?18:26;
-   const wave=(u,l)=>height*(.73+.09*Math.sin(u*6.3-phase)+.025*Math.sin(u*12+phase*.8))+(l-lines/2)*(width<600?3.6:4.8)*Math.sin(Math.PI*u);
-   const sheen=ctx.createLinearGradient(0,0,width,0);
-   sheen.addColorStop(0,'rgba(117,173,25,0)');
-   sheen.addColorStop(.18,'rgba(152,211,54,.20)');
-   sheen.addColorStop(.5,'rgba(199,242,114,.37)');
-   sheen.addColorStop(.78,'rgba(124,202,49,.27)');
-   sheen.addColorStop(1,'rgba(90,147,23,0)');
-   ctx.strokeStyle=sheen;ctx.lineWidth=width<600?.85:1;
-   for(let line=0;line<lines;line++){
-    ctx.beginPath();
-    for(let i=0;i<=70;i++){const u=i/70,x=u*width,y=wave(u,line);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}
-    ctx.stroke();
-   }
-   glow(width*(.28+.16*Math.sin(phase*.7)),height*(.65+.1*Math.cos(phase)),Math.min(width*.65,480),.13);
-   glow(width*(.77+.1*Math.cos(phase*.8)),height*(.48+.12*Math.sin(phase*.9)),Math.min(width*.7,510),.12);
-  }
   function draw(t){
    ctx.clearRect(0,0,width,height);
-   aurora(t);
    const compact=width<600,spacing=compact?29:27,hover=hoverStrength(t);
    glow(width*.1,height*.8,Math.min(width*.6,460),.04);
    glow(width*.92,height*.44,Math.min(width*.7,490),.03);
@@ -69,7 +50,7 @@ export function ParticleBackdrop({paused=false}){
     }
    }
   }
-  function active(){return !still;}
+  function active(t){return !still && (touch || t-pointer.movedAt<1.2 || bursts.length>0);}
   function tick(timestamp){
    frame=0;if(disposed||document.hidden||still)return;
    const t=timestamp/1000;
@@ -114,7 +95,12 @@ export function ParticleBackdrop({paused=false}){
   function touchMove(event){
    if(!touch||still)return;
    const finger=Array.from(event.touches).find(f=>f.identifier===touch.id);
-   if(finger)move({clientX:finger.clientX,clientY:finger.clientY});
+   if(!finger)return;
+   move({clientX:finger.clientX,clientY:finger.clientY});
+   const last=bursts.at(-1);
+   if(!last || (now()-last.time>.18 && Math.hypot(finger.clientX-last.x,finger.clientY-last.y)>36)){
+    burstAt(finger.clientX,finger.clientY);
+   }
   }
   function touchEnd(event){
    if(!touch||!Array.from(event.changedTouches).some(f=>f.identifier===touch.id))return;

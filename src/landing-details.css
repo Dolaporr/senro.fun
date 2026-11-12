@@ -14,3 +14,17 @@
 @media(prefers-reduced-motion:reduce){.landing-rule-card:hover .rule-emblem,.scenario-card:hover{transform:none}}
 
 @media(max-width:360px){.landing-rule-card h3{min-height:2.4em;font-size:16px}.landing-rule-card{padding:17px 12px}.purpose-copy h2{font-size:30px}.purpose-map{padding:20px 17px}}
+
+.landing-hero { isolation:isolate; }
+.limit-field { position:absolute; inset:auto 0 0; height:32%; pointer-events:none; z-index:-1; }
+.limit-field svg { width:100%; height:100%; overflow:visible; }
+.limit-field path { fill:none; stroke:url(#field-ink); stroke-width:2; stroke-linecap:round; stroke-dasharray:.15 8; opacity:.75; animation:field-flow 2s linear infinite; }
+@keyframes field-flow { to { stroke-dashoffset:-16.3; } }
+.limit-field[data-paused="true"] path { animation-play-state:paused; }
+@media(prefers-reduced-motion:reduce){ .limit-field path { animation:none; } }
+.rule-expand { background:transparent; border:0; color:inherit; font:inherit; padding:0; cursor:pointer; }
+.rule-row.editing { border-color:#9bb965; }
+.cap-example { margin:1rem 0; padding:1rem; border:1px solid #79934f70; border-radius:.65rem; }
+.cap-example label { display:grid; grid-template-columns:1fr auto; gap:.65rem; align-items:center; }
+.cap-example input { grid-column:1/-1; width:100%; accent-color:#bde971; }
+.cap-example output { display:block; margin-top:.5rem; font-size:.85rem; }

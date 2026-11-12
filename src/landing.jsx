@@ -25,6 +25,19 @@ export function Landing({engine,engineError,onOpen,backgroundPaused,onToggleBack
  function reset(){setAmount('0.10');setSelected('cap');setLimits(Object.fromEntries(MODES.map(m=>[m.id,m.value])));}
  return <div className="landing-page">
   <section className="landing-hero" aria-labelledby="landing-title">
+   <div className="limit-field" data-paused={backgroundPaused||reduced} aria-hidden="true">
+    <svg viewBox="0 0 800 220" preserveAspectRatio="none">
+     <defs>
+      <linearGradient id="field-ink"><stop stopColor="#a0cd57" stopOpacity="0"/><stop offset=".55" stopColor="#9fcf52"/><stop offset="1" stopColor="#e2ffaa"/></linearGradient>
+      <linearGradient id="field-edge" x2="0" y2="1"><stop stopColor="#b1e676" stopOpacity="0"/><stop offset=".53" stopColor="#d5ff91"/><stop offset="1" stopColor="#b1e676" stopOpacity="0"/></linearGradient>
+     </defs>
+     {Array.from({length:29},(_,i)=>{
+      const row=i-14;
+      return <path key={i} d={`M0 ${110+row*8} C310 ${60+row*12},510 ${175+row*4},646 ${112+row*2.2}`} pathLength="360" style={{animationDelay:`${-i*.19}s`}}/>;
+     })}
+     <rect x="647" y="30" width="2" height="165" fill="url(#field-edge)"/>
+    </svg>
+   </div>
    <motion.div className="landing-hero-copy" initial={{opacity:0,y:reduced?0:20}} animate={{opacity:1,y:0}} transition={{duration:.65}}>
     <span className="landing-kicker"><i/> SOLANA TRADING, WITH INTENTION</span>
     <h1 id="landing-title">Every trade.<br/><span>On your terms.</span></h1>
