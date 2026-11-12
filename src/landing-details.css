@@ -57,3 +57,15 @@
 .landing-scenarios { --landscape:url('/nature/examples.webp'); }
 .landing-questions { --landscape:url('/nature/questions.webp'); }
 .landing-bottom-cta { --landscape:url('/nature/closing.webp'); }
+
+.meadow-film {
+ position:absolute;
+ inset:0;
+ width:100%;
+ height:100%;
+ object-fit:cover;
+ border-radius:inherit;
+ pointer-events:none;
+ z-index:-2;
+ filter:brightness(.64);
+}

@@ -25,6 +25,7 @@ export function Landing({engine,engineError,onOpen,backgroundPaused,onToggleBack
  function reset(){setAmount('0.10');setSelected('cap');setLimits(Object.fromEntries(MODES.map(m=>[m.id,m.value])));}
  return <div className="landing-page">
   <section className="landing-hero" aria-labelledby="landing-title">
+   {!reduced && !backgroundPaused && <video className="meadow-film" src="/nature/hero.mp4" poster="/nature/hero.webp" autoPlay muted playsInline loop aria-hidden="true"/>}
    <div className="limit-field" data-paused={backgroundPaused||reduced} aria-hidden="true">
     <svg viewBox="0 0 800 220" preserveAspectRatio="none">
      <defs>
