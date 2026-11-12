@@ -29,7 +29,7 @@
 .cap-example input { grid-column:1/-1; width:100%; accent-color:#bde971; }
 .cap-example output { display:block; margin-top:.5rem; font-size:.85rem; }
 
-/* Each section uses a still from the same grassland series. */
+/* Keep content constrained; let the grassland backgrounds reach the viewport edges. */
 .landing-page > section {
  position:relative;
  isolation:isolate;
@@ -37,10 +37,10 @@
 .landing-page > section::before {
  content:"";
  position:absolute;
- inset:0;
+ inset:0 calc(50% - 50vw);
  z-index:-2;
  pointer-events:none;
- border-radius:inherit;
+ border-radius:0;
  background-image:linear-gradient(90deg,rgba(3,8,5,.86),rgba(3,8,5,.52)),var(--landscape);
  background-position:center;
  background-size:cover;
@@ -57,14 +57,15 @@
 .landing-scenarios { --landscape:url('/nature/examples.webp'); }
 .landing-questions { --landscape:url('/nature/questions.webp'); }
 .landing-bottom-cta { --landscape:url('/nature/closing.webp'); }
+.landing-page > .landing-bottom-cta { overflow:visible; }
 
 .meadow-film {
  position:absolute;
- inset:0;
- width:100%;
+ inset:0 auto 0 calc(50% - 50vw);
+ width:100vw;
  height:100%;
  object-fit:cover;
- border-radius:inherit;
+ border-radius:0;
  pointer-events:none;
  z-index:-2;
  filter:brightness(.64);
