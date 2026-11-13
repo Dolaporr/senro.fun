@@ -17,6 +17,7 @@ import './interaction-polish.css';
 import './checkpoint-theme.css';
 import './particle-finish.css';
 import './landing-details.css';
+import './nature-theme.css';
 
 const spring={type:'spring',stiffness:330,damping:32};
 function CapExample({value,quote}){
@@ -100,7 +101,7 @@ function App(){
  function download(){const data={product:'SENRO',kind:'local-rule-draft',version:revision,policyFingerprint:fingerprint,config,scope:'router-only',chainStatus:'not-deployed',simulationMarket:live.mode==='mainnet'?live.market:null,simulationOnly:true};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='senro-rule-draft.json';a.click();URL.revokeObjectURL(a.href)}
  let customResult=null;try{if(engine)customResult=evaluate(engine,config,parseAmount(testAmount,QUOTES[config.quote].decimals));}catch{}
  const pageVariants={hidden:{opacity:0,y:12},show:{opacity:1,y:0},exit:{opacity:0,y:-8}};
- return <MotionConfig reducedMotion="user"><div className="app-shell glass-studio"><ParticleBackdrop paused={backgroundPaused}/>
+ return <MotionConfig reducedMotion="user"><div className="app-shell glass-studio"><ParticleBackdrop paused={backgroundPaused||view==='landing'}/>
   <motion.header className={`topbar ${view==='landing'?'landing-topbar':''}`} initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} transition={{duration:.5}}>
    <button className="brand" onClick={()=>setView('landing')} aria-label="SENRO home"><Mark/><span>SENRO</span></button>
    {view==='landing'?<nav className="main-nav landing-nav" aria-label="Main navigation"><button onClick={()=>window.scrollTo({top:0,behavior:reduced?'auto':'smooth'})}>Overview</button><button onClick={()=>document.getElementById('how-it-works')?.scrollIntoView({behavior:reduced?'auto':'smooth'})}>How it works</button><button onClick={()=>document.getElementById('landing-examples')?.scrollIntoView({behavior:reduced?'auto':'smooth'})}>Examples</button><button onClick={()=>document.getElementById('questions')?.scrollIntoView({behavior:reduced?'auto':'smooth'})}>Questions</button></nav>:<nav className="main-nav" aria-label="Main navigation">{[['studio','Studio'],['rules','Rule sets'],['activity','Activity']].map(([id,label])=><button key={id} onClick={()=>setView(id)} className={view===id?'selected':''}><SenroIcon name={id==='rules'?'rules':id==='activity'?'activity':'studio'} size={15}/>{label}{view===id&&<motion.i layoutId="nav-line" transition={spring}/>}</button>)}</nav>}
