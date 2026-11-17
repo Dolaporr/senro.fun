@@ -17,3 +17,27 @@ Vite's existing vite.config.js contains the read-only Solana RPC middleware. A p
 7. Hooks: distinguish router-only enforcement from native token-wide restrictions; never promise that direct Pump trades honor SENRO rules.
 
 No mainnet launch, signature, payment or broadcast was performed. Mock tests are not live transaction tests.
+
+
+## Status as of this branch (read this before relying on anything above)
+
+| Gate | State | Evidence kind |
+| --- | --- | --- |
+| 1 Metadata storage | Service, auth, sniffing, rate limits, gateway re-verification implemented (`worker/launchpad-upload.mjs`, `/api/launchpad/upload`) | MOCKED provider and gateway. No real IPFS upload has been performed. Blocked on `PINATA_JWT` (and optional `IPFS_GATEWAY`) being set in the host. |
+| 2 Pump SDK | `create_v2` builder/inspector (`src/launchpad-create-tx.mjs`) | Real `@pump-fun/pump-sdk` instruction building, unit-tested offline. |
+| 3 Simulation | Exact-message simulation with hash/blockhash binding, through the launch-scoped relay (`/api/launch-rpc`) | MOCKED upstream RPC. No real-cluster simulation has been performed. |
+| 4 Submission | Sign, send (relay), poll, verify mint/curve; no retries | MOCKED upstream RPC and wallet. Gated off: needs `VITE_LAUNCH_ENABLED=true`, which must not be set without explicit production approval. |
+| 5 Discovery | Not started | n/a |
+| 6 Trading | Not started (existing read-only Pump/PumpSwap simulation untouched) | n/a |
+| 7 Hooks | Not started; direct Pump/PumpSwap trades bypass router-only rules | n/a |
+
+### Relays
+- `/api/solana` (existing): read-only, refuses every broadcast. Unchanged.
+- `/api/launch-rpc` (new): separate. Simulates or sends only a v0, two-signer, no-lookup-table transaction with at most ComputeBudget limit/price and exactly one Pump `create_v2` instruction; sends need both signatures to verify, preflight on, no relay retries. Small read allow-list; all other methods and batches refused.
+
+### Required before any live launch
+1. Real upload test with provider credentials (server-side only).
+2. Real simulation on mainnet with a funded test wallet, with the owner's explicit approval.
+3. Owner's explicit production approval, then build with `VITE_LAUNCH_ENABLED=true`.
+4. A single supervised launch with the owner's approval, recorded by signature.
+5. Add rate limiting to `/api/launch-rpc` (not implemented; per-instance limits are best-effort).
