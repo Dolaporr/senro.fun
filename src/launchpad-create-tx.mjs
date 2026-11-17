@@ -7,12 +7,15 @@
 // Scope of this version: launch WITHOUT an initial buy (SOL-quoted curve, no mayhem mode, no holder
 // reward, no custom creator fee). An initial buy stays disabled until its quote, slippage and
 // fee/rent maths are verified against a live Global account.
-import {Buffer} from 'buffer';
 import {ComputeBudgetProgram,PublicKey,TransactionMessage,VersionedTransaction} from '@solana/web3.js';
 import {sha256,hex} from './policy-client.mjs';
 import {base58} from './guarded-trade.mjs';
 import {assertSimulatedLaunch} from './launchpad-plan.mjs';
 import {loadPumpSdk} from './pump-sdk.mjs';
+
+// Browser-safe helpers: this module is bundled for the browser, where Node's Buffer does not exist.
+const sameBytes=(a,b)=>a.length===b.length&&a.every((v,i)=>v===b[i]);
+const base64Length=text=>{const clean=String(text??'').replace(/=+$/,'');return Math.floor(clean.length*3/4);};
 
 export const PACKET_LIMIT=1232;
 export const GENESIS_HASH=Object.freeze({
@@ -91,7 +94,7 @@ export async function assertLaunchTransaction(tx,plan,options={}){
  if(actual.length!==expected.length)throw Error('Launch transaction has unexpected instructions.');
  actual.forEach((ix,i)=>{
   const want=expected[i];
-  if(!ix.programId.equals(want.programId)||!Buffer.from(ix.data).equals(Buffer.from(want.data))||!sameKeys(ix.keys,want.keys))throw Error(`Launch instruction ${i} differs from the verified SDK instruction.`);
+  if(!ix.programId.equals(want.programId)||!sameBytes(ix.data,want.data)||!sameKeys(ix.keys,want.keys))throw Error(`Launch instruction ${i} differs from the verified SDK instruction.`);
  });
  return true;
 }
@@ -149,7 +152,7 @@ export async function simulateLaunch({connection,transaction,binding,plan,now=Da
  const addresses=[...new Set([binding.creator,...writable])];
  const [before,feeResult]=await Promise.all([connection.getBalance(creator,'confirmed'),connection.getFeeForMessage(transaction.message,'confirmed')]);
  const response=await connection.simulateTransaction(transaction,{sigVerify:false,replaceRecentBlockhash:false,commitment:'confirmed',accounts:{encoding:'base64',addresses}});
- const accounts=(response.value.accounts??[]).map((a,i)=>a?{address:addresses[i],lamports:a.lamports,owner:a.owner,dataLength:Buffer.from(a.data[0],'base64').length}:{address:addresses[i],lamports:null});
+ const accounts=(response.value.accounts??[]).map((a,i)=>a?{address:addresses[i],lamports:a.lamports,owner:a.owner,dataLength:base64Length(a.data[0])}:{address:addresses[i],lamports:null});
  const after=accounts.find(a=>a.address===binding.creator)?.lamports;
  return {
   err:response.value.err??null,logs:response.value.logs??[],unitsConsumed:response.value.unitsConsumed??null,

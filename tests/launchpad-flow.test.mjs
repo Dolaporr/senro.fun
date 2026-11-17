@@ -217,3 +217,15 @@ test('uploadLaunchMetadata: wallet-signed message is accepted by the real upload
  await assert.rejects(uploadLaunchMetadata({form,wallet:{features:{}},account,fetcher,base:ORIGIN}),/message/);
  assert.equal(sniffImage(PNG),'image/png');
 });
+
+test('upload errors tell the person what to do, by status',async()=>{
+ const creator=Keypair.generate();
+ const account={address:creator.publicKey.toBase58(),features:['solana:signMessage']};
+ const wallet={features:{'solana:signMessage':{async signMessage({message}){return [{signedMessage:message,signature:new Uint8Array(64)}];}}}};
+ const form={name:'Orbit',symbol:'ORB',image:new Blob([PNG],{type:'image/png'})};
+ const expect={401:/Reconnect/,413:/under 5 MB/,415:/PNG, JPG or WebP/,429:/Wait a few minutes/,502:/nothing was kept/,503:/not set up/};
+ for(const [status,pattern] of Object.entries(expect)){
+  const fetcher=async()=>new Response(JSON.stringify({error:'internal text'}),{status:Number(status)});
+  await assert.rejects(uploadLaunchMetadata({form,wallet,account,fetcher,base:ORIGIN}),e=>pattern.test(e.message)&&e.status===Number(status),String(status));
+ }
+});

@@ -12,7 +12,15 @@ export function createLaunchConnection({fetcher=globalThis.fetch?.bind(globalThi
 }
 
 const hex=bytes=>Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
-const readError=async response=>{const body=await response.json().catch(()=>({}));const e=Error(body.error??`Upload failed (${response.status}).`);e.status=response.status;e.fields=body.errors;return e;};
+const UPLOAD_ERRORS={
+ 401:'Your wallet signature was not accepted. Reconnect your wallet and try again.',
+ 413:'The image is too large. Choose one under 5 MB.',
+ 415:'That file is not a PNG, JPG or WebP image. Choose a different one.',
+ 429:'Too many uploads from this wallet or network. Wait a few minutes and try again.',
+ 502:'The storage service could not confirm the upload, so nothing was kept. Try again in a moment.',
+ 503:'Uploads are not set up on this site yet. Nothing was launched.'
+};
+const readError=async response=>{const body=await response.json().catch(()=>({}));const e=Error(UPLOAD_ERRORS[response.status]??body.error??'The upload failed. Try again.');e.status=response.status;e.fields=body.errors;return e;};
 
 /**
  * Uploads the artwork and metadata. The wallet signs a short text message (no transaction, no funds) that
