@@ -17,7 +17,7 @@ import {buildLaunchTransaction,simulateLaunch,signLaunchWithWallet,submitLaunch,
 export const DISABLED_REASON='Live launches are not enabled in this deployment. Everything up to simulation runs; nothing is signed or sent.';
 const sameMetadata=(form,doc)=>doc&&doc.name===form.name&&doc.symbol===form.symbol;
 
-export function createLaunchFlow({enabled=false,connection,wallet,account,upload,newMint=()=>Keypair.generate(),now=Date.now,confirm={},persist=()=>{}}){
+export function createLaunchFlow({enabled=false,connection,wallet,account,upload,newMint=()=>Keypair.generate(),now=Date.now,confirm={},persist=()=>{},onLaunched=()=>{}}){
  let state={stage:'idle'},generation=0,session=null;
  const listeners=new Set();
  const set=(patch,gen=generation)=>{if(gen!==generation)return false;state={...patch};listeners.forEach(fn=>fn(state));return true;};
@@ -68,7 +68,12 @@ export function createLaunchFlow({enabled=false,connection,wallet,account,upload
    }});
    session=null;
    if(outcome.status==='confirmed'){
-    try{const chain=await verifyLaunchedMint({connection,plan});return set({stage:'launched',review:state.review,signature:outcome.signature,chain},gen),state;}
+    try{
+     const chain=await verifyLaunchedMint({connection,plan});
+     // Recording is best effort: a storage problem must never turn a real launch into an error.
+     try{onLaunched({signature:outcome.signature,slot:outcome.slot,mint:binding.mint,creator:binding.creator,name:state.review.name,symbol:state.review.symbol,metadataUri:state.review.metadataUri,imageUri:state.review.imageUri,state:'live'});}catch{}
+     return set({stage:'launched',review:state.review,signature:outcome.signature,slot:outcome.slot,chain},gen),state;
+    }
     catch(e){return set({stage:'unverified',review:state.review,signature:outcome.signature,error:`Confirmed, but the on-chain check failed: ${e.message}`},gen),state;}
    }
    const messages={failed:'The transaction failed on-chain. Check the signature before trying again.',expired:'The transaction expired without landing. Prepare a new launch.',unknown:'Confirmation is still unknown. Check the signature before doing anything else; do not resubmit.'};

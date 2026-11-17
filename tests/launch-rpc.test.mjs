@@ -147,3 +147,44 @@ test('end to end through the HTTP layer: a real launch simulates, a transfer is 
  assert.equal((await handleLaunchRpc(post(send(evil)),fetcher)).status,400);
  assert.equal(upstreamCalls,1,'the arbitrary transfer never reached an upstream');
 });
+
+// ---- rate limits and private RPC (added with the production hardening) ----
+import {createLaunchLimiters,clientKey,launchUpstreams,PUBLIC_UPSTREAMS,LIMITS} from '../worker/launch-rpc.mjs';
+
+test('per-client limits: reads, simulations and sends have separate budgets; a spoofed forwarded-for does not help',async()=>{
+ let t=0;const limiters=createLaunchLimiters(()=>t);
+ const fetcher=async()=>new Response(JSON.stringify({jsonrpc:'2.0',id:1,result:1}));
+ const read=(ip,headers={})=>handleLaunchRpc(post({jsonrpc:'2.0',id:1,method:'getBlockHeight',params:[]},{headers}),fetcher,{limiters,ip});
+ for(let i=0;i<LIMITS.read.limit;i++)assert.equal((await read('1.1.1.1')).status,200);
+ const blocked=await read('1.1.1.1');assert.equal(blocked.status,429);assert.match((await blocked.json()).error.message,/Too many requests/);
+ assert.equal((await read('1.1.1.1',{'x-forwarded-for':'9.9.9.9'})).status,429,'rotating x-forwarded-for does not reset the budget');
+ assert.equal((await read('2.2.2.2')).status,200,'another client is unaffected');
+ const {transaction}=await launch();
+ assert.equal((await handleLaunchRpc(post(sim(transaction)),fetcher,{limiters,ip:'1.1.1.1'})).status,200,'simulation has its own budget');
+ t+=LIMITS.read.windowMs+1;assert.equal((await read('1.1.1.1')).status,200,'the window slides');
+});
+
+test('sends are limited to a handful per connection',async()=>{
+ const limiters=createLaunchLimiters(()=>0);
+ const fetcher=async()=>new Response(JSON.stringify({jsonrpc:'2.0',id:1,result:'sig'}));
+ const statuses=[];
+ for(let i=0;i<LIMITS.send.limit+1;i++){const {transaction}=await launch({sign:true});statuses.push((await handleLaunchRpc(post(send(transaction)),fetcher,{limiters,ip:'3.3.3.3'})).status);}
+ assert.deepEqual(statuses,[...Array(LIMITS.send.limit).fill(200),429]);
+});
+
+test('client key trusts only platform addresses',()=>{
+ const req=h=>new Request('https://senro.test/api/launch-rpc',{headers:h});
+ assert.equal(clientKey(req({'x-forwarded-for':'6.6.6.6'})),'shared');
+ assert.equal(clientKey(req({'x-nf-client-connection-ip':'5.5.5.5','x-forwarded-for':'6.6.6.6'})),'5.5.5.5');
+ assert.equal(clientKey(req({}),'7.7.7.7'),'7.7.7.7');
+});
+
+test('a private RPC goes first, public ones stay as fallback; bad config is refused; the key never leaks',async()=>{
+ assert.deepEqual(launchUpstreams(undefined),PUBLIC_UPSTREAMS);
+ const ups=launchUpstreams('https://mainnet.helius-rpc.com/?api-key=SECRETKEY');
+ assert.equal(ups[0],'https://mainnet.helius-rpc.com/?api-key=SECRETKEY');assert.deepEqual(ups.slice(1),PUBLIC_UPSTREAMS);
+ assert.throws(()=>launchUpstreams('http://insecure.example'),/HTTPS/);assert.throws(()=>launchUpstreams('nope'),/valid URL/);
+ const tried=[];
+ const r=await handleLaunchRpc(post({jsonrpc:'2.0',id:1,method:'getBlockHeight',params:[]}),async url=>{tried.push(url);throw Error('down');},{upstreams:ups});
+ assert.equal(tried[0],ups[0]);assert.equal(r.status,502);assert.ok(!JSON.stringify(await r.json()).includes('SECRETKEY'));
+});

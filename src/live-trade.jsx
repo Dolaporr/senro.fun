@@ -15,7 +15,7 @@ import {parseAmount,formatAmount} from './policy-client.mjs';
 
 export function useLiveTrade({config,revision}){
  const [mode,setModeValue]=useState('mainnet'),[wallets,setWallets]=useState([]),[account,setAccount]=useState(null),[walletDialog,setWalletDialog]=useState(false),[walletBusy,setWalletBusy]=useState(false),[walletError,setWalletError]=useState('');
- const [mintInput,setMintInput]=useState(''),[market,setMarket]=useState(null),[marketBusy,setMarketBusy]=useState(false),[marketError,setMarketError]=useState('');
+ const [mintInput,setMintInput]=useState(()=>{try{const m=new URLSearchParams(location.search).get('mint');return m&&publicKey(m)?m:''}catch{return ''}}),[market,setMarket]=useState(null),[marketBusy,setMarketBusy]=useState(false),[marketError,setMarketError]=useState('');
  const [rpc,setRpc]=useState(DEFAULT_RPC),[amount,setAmountValue]=useState('0.10'),[slippage,setSlippageValue]=useState('100'),[result,setResult]=useState(null),[busy,setBusy]=useState(false),[progress,setProgress]=useState(''),[error,setError]=useState(''),[panel,setPanel]=useState(null),[history,setHistory]=useState([]),[now,setNow]=useState(Date.now());
  const [tradeBusy,setTradeBusy]=useState(false),[tradeError,setTradeError]=useState(''),[receipt,setReceipt]=useState(()=>{try{const r=JSON.parse(sessionStorage.getItem('senro-pending-trade'));return r&&/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(r.signature)&&Number.isSafeInteger(r.lastValidBlockHeight)?r:null;}catch{return null;}}),[nativeBound,setNativeBoundValue]=useState('0.01');
  const tradeLock=useRef(false),walletAccount=useRef(null),connectionEpoch=useRef(0);

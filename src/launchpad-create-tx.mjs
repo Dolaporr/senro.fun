@@ -206,13 +206,13 @@ export async function waitForConfirmation({connection,signature,lastValidBlockHe
   const status=response?.value?.[0];
   if(status){
    if(status.err)return {status:'failed',signature,err:status.err};
-   if(['confirmed','finalized'].includes(status.confirmationStatus))return {status:'confirmed',signature};
+   if(['confirmed','finalized'].includes(status.confirmationStatus))return {status:'confirmed',signature,slot:status.slot};
   }
   const height=await connection.getBlockHeight('confirmed').catch(()=>null);
   if(height!==null&&height>lastValidBlockHeight){
    const last=await connection.getSignatureStatuses([signature],{searchTransactionHistory:true}).catch(()=>null);
    const final=last?.value?.[0];
-   if(final&&!final.err&&['confirmed','finalized'].includes(final.confirmationStatus))return {status:'confirmed',signature};
+   if(final&&!final.err&&['confirmed','finalized'].includes(final.confirmationStatus))return {status:'confirmed',signature,slot:final.slot};
    if(final?.err)return {status:'failed',signature,err:final.err};
    return {status:'expired',signature};
   }
