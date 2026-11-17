@@ -229,3 +229,16 @@ test('upload errors tell the person what to do, by status',async()=>{
   await assert.rejects(uploadLaunchMetadata({form,wallet,account,fetcher,base:ORIGIN}),e=>pattern.test(e.message)&&e.status===Number(status),String(status));
  }
 });
+
+test('a confirmed launch is handed to onLaunched with its slot; a failing recorder never breaks the launch',async()=>{
+ const {normalizeLaunch}=await import('../src/launch-registry.mjs');
+ for(const recorder of [rec=>{recorded.push(normalizeLaunch(rec));},()=>{throw Error('storage full');}]){
+  var recorded=[];
+  const t=setup();
+  const flow=createLaunchFlow({enabled:true,connection:t.connection,wallet:{features:{'solana:signTransaction':{supportedTransactionVersions:[0],async signTransaction({transaction}){const tx=VersionedTransaction.deserialize(transaction);tx.sign([t.creator]);return [{signedTransaction:tx.serialize()}];}}}},account:t.account,upload:async({form})=>({verified:true,metadataUri:'https://g.test/ipfs/Qm'+'1'.repeat(44),imageUri:'https://g.test/ipfs/Qm'+'2'.repeat(44),metadata:{name:form.name,symbol:form.symbol}}),confirm:{wait:async()=>{},intervalMs:0},onLaunched:recorder});
+  const {review}=await flow.prepare(t.form);
+  const state=await flow.launch({messageHash:review.messageHash});
+  assert.equal(state.stage,'launched');assert.equal(state.slot,43);
+  if(recorded.length){assert.equal(recorded[0].slot,43);assert.equal(recorded[0].creator,t.account.address);assert.equal(recorded[0].name,'Orbit');assert.equal(recorded[0].signature,state.signature);}
+ }
+});

@@ -53,6 +53,33 @@ await click(p,'Approve and sign');await waitText(p,'Your token is live.',30000);
 await p.screenshot({path:path.join(os.tmpdir(),'s5-launched.png')});
 const st=await api(4181,'x');
 console.log('LIVE success: wallet calls',await p.evaluate(()=>window.__walletCalls),'sent',st.sent,'uploads',st.uploads,'pending stored',await p.evaluate(()=>!!sessionStorage.getItem('senro-pending-launch')));
+// 2b registry: the confirmed launch is listed, survives a reload, reconciles, and deep-links into the studio
+await p.keyboard.press('Escape');
+await p.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Close'))?.click());
+await waitText(p,'Your launches');
+const listed=await text(p);
+console.log('REGISTRY listed:',listed.includes('Mossback')&&listed.includes('Live on Pump'));
+const stored=await p.evaluate(()=>JSON.parse(localStorage.getItem('senro-launches-v1')));
+console.log('REGISTRY stored records:',stored.records.length,'slot',stored.records[0].slot,'pending cleared',await p.evaluate(()=>!sessionStorage.getItem('senro-pending-launch')));
+await p.reload({waitUntil:'networkidle2'});await waitText(p,'Your launches');
+console.log('REGISTRY survives reload:',(await text(p)).includes('Mossback'));
+await click(p,'Check all on-chain');await waitText(p,'Live on Pump');
+await p.screenshot({path:path.join(os.tmpdir(),'s8-launches.png'),fullPage:true});
+const mint=stored.records[0].mint;
+const studio=await browser.newPage();await studio.setViewport({width:1280,height:900});
+await studio.goto(`http://localhost:4181/?mint=${mint}#studio`,{waitUntil:'networkidle2'});
+await studio.waitForSelector('#live-mint',{timeout:15000}).catch(()=>{});
+console.log('STUDIO deep link prefilled:',await studio.evaluate(()=>document.getElementById('live-mint')?.value??'no field')===mint);
+await studio.goto('http://localhost:4181/?mint=not-a-mint#studio',{waitUntil:'networkidle2'});
+console.log('STUDIO bad mint ignored:',await studio.evaluate(()=>document.getElementById('live-mint')?.value??'no field'));
+await studio.close();
+// landing entry
+const landing=await browser.newPage();await landing.setViewport({width:1280,height:900});
+await landing.goto('http://localhost:4181/',{waitUntil:'networkidle2'});
+console.log('LANDING links to launchpad:',await landing.$$eval('a[href="/launchpad.html"]',a=>a.length));
+await landing.evaluate(()=>document.getElementById('launchpad')?.scrollIntoView());await new Promise(r=>setTimeout(r,600));
+await landing.screenshot({path:path.join(os.tmpdir(),'s9-landing-launchpad.png')});
+await landing.close();
 await p.close();
 
 // 3 live, simulation failure

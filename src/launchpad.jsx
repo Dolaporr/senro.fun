@@ -6,6 +6,7 @@ import {getWallets} from '@wallet-standard/app';
 import {validateLaunch} from './launchpad-model.mjs';
 import {createLaunchFlow,DISABLED_REASON} from './launchpad-flow.mjs';
 import {createLaunchConnection,uploadLaunchMetadata} from './launch-client.mjs';
+import {loadRegistry,saveRegistry,reconcileLaunches,studioLink} from './launch-registry.mjs';
 import './launchpad.css';
 
 // Live launches stay off unless the deployment is built with VITE_LAUNCH_ENABLED=true.
@@ -14,6 +15,7 @@ const PENDING_KEY='senro-pending-launch';
 const initial={name:'',symbol:'',description:'',website:'',twitter:'',telegram:'',image:null};
 const short=(a,n=4)=>a?`${a.slice(0,n)}…${a.slice(-n)}`:'';
 const sol=l=>l==null?'Not available':`${(l/1e9).toFixed(l<1e6?6:4)} SOL`;
+const STATE_LABEL={recorded:'Recorded',live:'Live on Pump',graduated:'Graduated',missing:'Not found yet',mismatch:'Does not match the record',unreachable:'Could not check'};
 const readPending=()=>{try{const r=JSON.parse(sessionStorage.getItem(PENDING_KEY));return r&&/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(r.signature)?r:null;}catch{return null;}};
 
 // The launch really is a sequence, so the steps are numbered.
@@ -28,6 +30,8 @@ const STEPS=[
 ];
 const POSITION={uploading:[0],building:[1],simulating:[2],ready:[3],blocked:[3],'simulation-failed':[2,true],signing:[4],submitting:[5],confirming:[5],launched:[7],failed:[5,true],expired:[5,true],unknown:[5,true],unverified:[6,true]};
 
+function LaunchArt({record}){const [failed,setFailed]=useState(false);return <span className="lp-launch-art">{record.imageUri&&!failed?<img src={record.imageUri} alt="" loading="lazy" width="44" height="44" onError={()=>setFailed(true)}/>:<span>{record.symbol.slice(0,2)}</span>}</span>}
+
 function Mark(){return <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M23 9H12a4 4 0 0 0 0 8h8a4 4 0 0 1 0 8H9" stroke="currentColor" strokeWidth="4" strokeLinecap="square"/></svg>}
 
 function Steps({stage,lastIndex,compact}){
@@ -41,6 +45,9 @@ function Steps({stage,lastIndex,compact}){
 function App(){
  const [form,setForm]=useState(initial),[sheet,setSheet]=useState(false),[wallets,setWallets]=useState([]),[picker,setPicker]=useState(false),[connected,setConnected]=useState(null),[walletError,setWalletError]=useState(''),[flowState,setFlowState]=useState({stage:'idle'}),[pending,setPending]=useState(readPending),[pendingNote,setPendingNote]=useState(''),[imageUrl,setImageUrl]=useState('');
  const flowRef=useRef(null),lastIndex=useRef(0),connection=useMemo(()=>createLaunchConnection(),[]);
+ const registry=useMemo(()=>loadRegistry(),[]),[launches,setLaunches]=useState(()=>registry.list()),[shown,setShown]=useState(8),[checking,setChecking]=useState(false),[checkNote,setCheckNote]=useState('');
+ const syncLaunches=()=>{saveRegistry(registry);setLaunches(registry.list())};
+ async function checkLaunches(mints){setChecking(true);setCheckNote('');try{const out=await reconcileLaunches({connection,registry,mints});if(Object.values(out).every(r=>r.state==='unreachable'))setCheckNote('The network could not be reached. Try again.');}catch{setCheckNote('The check could not run. Try again.');}syncLaunches();setChecking(false);}
  const result=validateLaunch(form),account=connected?.account.address??'';
  const stage=flowState.stage,busy=['uploading','building','simulating','signing','submitting','confirming'].includes(stage);
  const position=POSITION[stage];if(position)lastIndex.current=Math.min(position[0],STEPS.length-1);
@@ -51,11 +58,11 @@ function App(){
  useEffect(()=>{
   flowRef.current?.cancel();
   if(!connected){flowRef.current=null;setFlowState({stage:'idle'});return;}
-  const flow=createLaunchFlow({enabled:LAUNCH_ENABLED,connection,wallet:connected.wallet,account:connected.account,upload:args=>uploadLaunchMetadata(args),persist:rec=>{try{sessionStorage.setItem(PENDING_KEY,JSON.stringify(rec));}catch{}setPending(rec);}});
+  const flow=createLaunchFlow({enabled:LAUNCH_ENABLED,connection,wallet:connected.wallet,account:connected.account,upload:args=>uploadLaunchMetadata(args),persist:rec=>{try{sessionStorage.setItem(PENDING_KEY,JSON.stringify(rec));}catch{}setPending(rec);},onLaunched:rec=>{registry.ingest(rec);syncLaunches();try{sessionStorage.removeItem(PENDING_KEY);}catch{}setPending(null);}});
   flowRef.current=flow;setFlowState(flow.state);
   const off=flow.subscribe(setFlowState);
   return()=>{off();flow.cancel();};
- },[connected,connection]);
+ },[connected,connection,registry]);
 
  function change(key,value){flowRef.current?.cancel();setForm(v=>({...v,[key]:value}));setSheet(false)}
  async function connect(w){setWalletError('');try{const out=await w.features['standard:connect'].connect();const next=(out.accounts??w.accounts).find(a=>a.chains.includes('solana:mainnet'));if(!next)throw Error('This wallet has no Solana mainnet account.');setConnected({wallet:w,account:next});setPicker(false)}catch(e){setWalletError(String(e.message??e).slice(0,180))}}
@@ -101,6 +108,16 @@ function App(){
      <p>{LAUNCH_ENABLED?'You approve once, in your wallet, after seeing the cost.':'Preview release. You can upload, build and simulate. Nothing is signed or sent.'}</p>
      <button type="button" className="lp-primary" disabled={!result.valid||busy} onClick={()=>{if(!connected){setPicker(true);return;}setSheet(true);flowRef.current.prepare(form)}}>{connected?'Review launch':'Connect wallet to review'}<ArrowUpRight size={16}/></button>
     </div>
+    {launches.length>0&&<section className="lp-section lp-launches" aria-label="Your launches">
+     <h2>Your launches<small>kept in this browser</small></h2>
+     <ul className="lp-launch-list">{registry.page({limit:shown}).items.map(r=><li className="lp-launch" key={r.mint}>
+      <LaunchArt record={r}/>
+      <div><b>{r.name} <em>{r.symbol}</em></b><small><code>{short(r.mint,5)}</code> in slot {r.slot.toLocaleString('en-US')}</small></div>
+      <span className="lp-launch-state" data-state={r.state}>{STATE_LABEL[r.state]}</span>
+      <span className="lp-launch-actions"><a href={`https://solscan.io/token/${r.mint}`} target="_blank" rel="noreferrer">Solscan</a><a href={studioLink(r.mint)}>Simulate a buy</a><button disabled={checking} onClick={()=>checkLaunches([r.mint])}>Check</button></span>
+     </li>)}</ul>
+     <div className="lp-launch-foot">{launches.length>shown&&<button className="lp-ghost" onClick={()=>setShown(n=>n+8)}>Show more</button>}<button className="lp-ghost" disabled={checking} onClick={()=>checkLaunches(null)}>{checking?'Checking…':'Check all on-chain'}</button>{checkNote&&<span className="lp-err">{checkNote}</span>}</div>
+    </section>}
     {pending&&<div className="lp-note lp-pending"><Info size={16}/><span>A launch from this session is still unresolved: <code>{short(pending.signature,8)}</code> <a href={`https://solscan.io/tx/${pending.signature}`} target="_blank" rel="noreferrer">View on Solscan <ExternalLink size={11}/></a><button onClick={checkPending}>Check status</button>{pendingNote&&<><br/>{pendingNote}</>}</span></div>}
    </form>
 

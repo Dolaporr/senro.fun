@@ -1,0 +1,11 @@
+/* Landing entry to the launchpad. Unique class names so it cannot collide with the older section rules. */
+.landing-launchpad{display:grid;grid-template-columns:1fr 1fr;gap:60px 100px;align-items:end;padding:80px 0 90px;border-top:1px solid #ffffff16;scroll-margin-top:35px}
+.landing-launchpad .lpad-copy h2{margin:0;font:500 clamp(40px,4.6vw,66px)/1 'Space Grotesk','DM Sans',sans-serif;letter-spacing:-.065em;color:#f0f2e9}
+.landing-launchpad .lpad-copy h2 span{color:#caff64}
+.landing-launchpad .lpad-side{display:grid;justify-items:start;gap:22px}
+.landing-launchpad .lpad-side p{margin:0;max-width:380px;color:#a4aba5;font-size:15px;line-height:1.8;letter-spacing:-.01em}
+.landing-launchpad .lpad-side a{text-decoration:none}
+.landing-launchpad .lpad-side small{font:10px/1.6 'DM Mono',ui-monospace,monospace;color:#8e998d}
+.main-nav .nav-launch{color:#899581;font-size:12px;text-decoration:none;transition:color .2s}
+.main-nav .nav-launch:hover{color:#edf4e6}
+@media(max-width:820px){.landing-launchpad{grid-template-columns:1fr;gap:30px;padding:56px 0 64px}}

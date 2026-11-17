@@ -27,8 +27,8 @@ No mainnet launch, signature, payment or broadcast was performed. Mock tests are
 | 2 Pump SDK | `create_v2` builder/inspector (`src/launchpad-create-tx.mjs`) | Real `@pump-fun/pump-sdk` instruction building, unit-tested offline. |
 | 3 Simulation | Exact-message simulation with hash/blockhash binding, through the launch-scoped relay (`/api/launch-rpc`) | MOCKED upstream RPC. No real-cluster simulation has been performed. |
 | 4 Submission | Sign, send (relay), poll, verify mint/curve; no retries | MOCKED upstream RPC and wallet. Gated off: needs `VITE_LAUNCH_ENABLED=true`, which must not be set without explicit production approval. |
-| 5 Discovery | Not started | n/a |
-| 6 Trading | Not started (existing read-only Pump/PumpSwap simulation untouched) | n/a |
+| 5 Discovery | Registry of launches made through this page (`src/launch-registry.mjs`): one record per mint, duplicate/conflict handling, slot-ordered cursor pagination, localStorage persistence, on-chain reconciliation (live / graduated / missing / mismatch / unreachable). **Not a network-wide feed.** | Registry logic unit-tested; reconciliation uses the real SDK with a MOCKED connection. A public all-launches feed is **blocked**: it needs an indexer or webhook provider key and a verified event schema. |
+| 6 Trading | Existing read-only Pump/PumpSwap buy simulation untouched. The launchpad links each launch to it (`/?mint=…#studio`), which only prefills the contract field; nothing loads, signs or sends. | Browser e2e checks the link and that a bad mint is ignored. No new trade signing was added. |
 | 7 Hooks | Not started; direct Pump/PumpSwap trades bypass router-only rules | n/a |
 
 ### Relays
@@ -41,3 +41,9 @@ No mainnet launch, signature, payment or broadcast was performed. Mock tests are
 3. Owner's explicit production approval, then build with `VITE_LAUNCH_ENABLED=true`.
 4. A single supervised launch with the owner's approval, recorded by signature.
 5. Add rate limiting to `/api/launch-rpc` (not implemented; per-instance limits are best-effort).
+
+### Browser check (`npm run e2e:launchpad`)
+Headless Chrome against the real relay and upload handler, with a MOCKED chain, storage and wallet. It checks: the preview build never asks the wallet to sign a transaction; the live-enabled build signs once and sends once; a failed simulation or upload stops before signing; a confirmed launch is listed, survives a reload and reconciles; the studio deep link; the landing entry; no mobile overflow. It found one real bug (Node `Buffer` used in browser code). It is not evidence of a live launch.
+
+### Landing entry
+The landing page has a "Launch" nav link and a "Go to launchpad" section that open `/launchpad.html`.
