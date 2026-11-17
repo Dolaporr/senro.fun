@@ -11,6 +11,6 @@ export async function verifyMetadataDocument(uri,{fetcher=fetch,maxBytes=16384}=
  const raw=await response.text();if(new TextEncoder().encode(raw).length>maxBytes)throw Error('Metadata exceeds the size limit.');
  let doc;try{doc=JSON.parse(raw)}catch{throw Error('Metadata is not valid JSON.');}
  if(!doc||typeof doc!=='object'||Array.isArray(doc)||typeof doc.name!=='string'||typeof doc.symbol!=='string'||typeof doc.image!=='string')throw Error('Metadata is missing required token fields.');
- const checked=validateLaunch(doc);if(!checked.valid)throw Error('Metadata contains invalid token details.');
+ const checked=validateLaunch({...doc,image:null});if(!checked.valid)throw Error('Metadata contains invalid token details.');
  return {name:checked.metadata.name,symbol:checked.metadata.symbol,image:doc.image,uri:url.href};
 }

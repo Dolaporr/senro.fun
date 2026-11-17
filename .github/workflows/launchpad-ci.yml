@@ -11,7 +11,22 @@ on:
       - 'package*.json'
       - '.github/workflows/launchpad-ci.yml'
 jobs:
-  verify:
+  launchpad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --test tests/launchpad*.test.mjs
+      - run: npm run build
+      - run: npm run check:netlify
+      - name: Verify launchpad artifact
+        run: test -f dist/launchpad.html
+  existing-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -22,7 +37,3 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build
-      - run: npm run check:netlify
-      - name: Verify launchpad artifact
-        run: test -f dist/launchpad.html
