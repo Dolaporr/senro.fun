@@ -9,3 +9,7 @@
 .main-nav .nav-launch{color:#899581;font-size:12px;text-decoration:none;transition:color .2s}
 .main-nav .nav-launch:hover{color:#edf4e6}
 @media(max-width:820px){.landing-launchpad{grid-template-columns:1fr;gap:30px;padding:56px 0 64px}}
+.landing-header-launch{display:inline-flex;align-items:center;min-height:38px;padding:0 15px;margin-right:10px;border:1px solid #caff6455;border-radius:7px;color:#caff64;font-size:12px;font-weight:500;text-decoration:none;white-space:nowrap;transition:background .2s,border-color .2s}
+.landing-header-launch:hover{background:#caff640f;border-color:#caff6499}
+.landing-header-launch:focus-visible{outline:2px solid #caff64;outline-offset:3px}
+@media(max-width:520px){.landing-header-launch{min-height:36px;padding:0 13px;margin-right:0;font-size:12px}.topbar:has(.landing-header-launch) .landing-header-cta{display:none}}
