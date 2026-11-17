@@ -11,6 +11,12 @@
     "check:netlify": "node scripts/validate-netlify.mjs",
     "check:live": "node scripts/check-live-site.mjs"
   },
+  "imports": {
+    "#pump-sdk": {
+      "node": "./src/pump-sdk-node.cjs",
+      "default": "@pump-fun/pump-sdk"
+    }
+  },
   "dependencies": {
     "@noble/hashes": "1.8.0",
     "@pump-fun/pump-sdk": "^4.3.1",
