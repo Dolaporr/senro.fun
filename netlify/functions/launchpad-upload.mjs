@@ -4,9 +4,9 @@ import {handleUpload,pinataProvider,createRateLimiter} from '../../worker/launch
 const seen=new Map();
 const ipLimiter=createRateLimiter({limit:10,windowMs:60*60*1000});
 const walletLimiter=createRateLimiter({limit:5,windowMs:60*60*1000});
-export default function launchpadUpload(request){
+export default function launchpadUpload(request,context){
  let provider=null;
  try{provider=pinataProvider({jwt:process.env.PINATA_JWT,gateway:process.env.IPFS_GATEWAY||undefined});}catch{provider=null;}
- return handleUpload(request,{provider,seen,ipLimiter,walletLimiter});
+ return handleUpload(request,{provider,seen,ipLimiter,walletLimiter,ip:context?.ip});
 }
-export const config={path:'/api/launchpad/upload'};
+export const config={path:'/api/launchpad/upload',rateLimit:{windowLimit:20,windowSize:60,aggregateBy:['ip','domain']}};

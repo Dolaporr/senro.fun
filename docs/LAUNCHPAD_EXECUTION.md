@@ -29,7 +29,7 @@ No mainnet launch, signature, payment or broadcast was performed. Mock tests are
 | 4 Submission | Sign, send (relay), poll, verify mint/curve; no retries | MOCKED upstream RPC and wallet. Gated off: needs `VITE_LAUNCH_ENABLED=true`, which must not be set without explicit production approval. |
 | 5 Discovery | Registry of launches made through this page (`src/launch-registry.mjs`): one record per mint, duplicate/conflict handling, slot-ordered cursor pagination, localStorage persistence, on-chain reconciliation (live / graduated / missing / mismatch / unreachable). **Not a network-wide feed.** | Registry logic unit-tested; reconciliation uses the real SDK with a MOCKED connection. A public all-launches feed is **blocked**: it needs an indexer or webhook provider key and a verified event schema. |
 | 6 Trading | Existing read-only Pump/PumpSwap buy simulation untouched. The launchpad links each launch to it (`/?mint=…#studio`), which only prefills the contract field; nothing loads, signs or sends. | Browser e2e checks the link and that a bad mint is ignored. No new trade signing was added. |
-| 7 Hooks | Not started; direct Pump/PumpSwap trades bypass router-only rules | n/a |
+| 7 Creator analytics and rules (P5) | Read-only: curve progress to graduation, spot price, market cap and SOL in the curve per launch; the creator's Pump fee vault balance (shared across all their coins, minus the rent-exempt minimum). Fee-sharing configs are recognised. The launchpad states that SENRO rules apply only to buys made through SENRO; direct Pump trades are unaffected. No claim or sign action. No fee split assumed. | Maths checked by hand in tests; accounts encoded with the real SDK layout against a MOCKED connection; browser e2e shows the values. Not checked against live accounts. |
 
 ### Relays
 - `/api/solana` (existing): read-only, refuses every broadcast. Unchanged.
@@ -40,10 +40,21 @@ No mainnet launch, signature, payment or broadcast was performed. Mock tests are
 2. Real simulation on mainnet with a funded test wallet, with the owner's explicit approval.
 3. Owner's explicit production approval, then build with `VITE_LAUNCH_ENABLED=true`.
 4. A single supervised launch with the owner's approval, recorded by signature.
-5. Add rate limiting to `/api/launch-rpc` (not implemented; per-instance limits are best-effort).
+5. ~~Add rate limiting to `/api/launch-rpc`~~ Done: per-client budgets (reads 120/min, simulations 20/min, sends 5 per 10 min) keyed only on platform-set client IPs, plus Netlify platform rate limits on both functions.
 
 ### Browser check (`npm run e2e:launchpad`)
 Headless Chrome against the real relay and upload handler, with a MOCKED chain, storage and wallet. It checks: the preview build never asks the wallet to sign a transaction; the live-enabled build signs once and sends once; a failed simulation or upload stops before signing; a confirmed launch is listed, survives a reload and reconciles; the studio deep link; the landing entry; no mobile overflow. It found one real bug (Node `Buffer` used in browser code). It is not evidence of a live launch.
 
 ### Landing entry
 The landing page has a "Launch" nav link and a "Go to launchpad" section that open `/launchpad.html`.
+
+### Server environment (Netlify site settings, never in the browser)
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `PINATA_JWT` | yes, for uploads | Pinata API JWT used by `/api/launchpad/upload`. |
+| `IPFS_GATEWAY` | no | HTTPS gateway for returned links, e.g. a dedicated Pinata gateway. |
+| `LAUNCH_RPC_URL` | strongly recommended | Private HTTPS mainnet RPC (Helius, Triton, QuickNode). Used first by `/api/launch-rpc`; public RPCs are fallback. |
+| `VITE_LAUNCH_ENABLED` | no | `true` shows the approve-and-sign step. Build-time. The owner gave production approval on 2026-11-17; turning it on is a site setting so it can be turned off with one redeploy. |
+
+### Phone wallets
+On a phone browser with no injected wallet, the connect sheet offers "Open in Phantom" and "Open in Solflare". These open this page inside the wallet's browser and reopen the connect sheet there. They do not connect, sign or send.

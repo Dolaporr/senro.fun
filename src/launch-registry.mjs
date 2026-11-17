@@ -77,12 +77,15 @@ export function saveRegistry(registry,storage=globalThis.localStorage,key=REGIST
 }
 
 /** Pure: turns the two on-chain accounts into a state. A graduated curve is a normal state, not an error. */
-export function classifyLaunch(record,{mintAccount,curveAccount},{PUMP_SDK,PUMP_PROGRAM_ID}){
+export function classifyLaunch(record,{mintAccount,curveAccount},deps){
+ const {PUMP_SDK,PUMP_PROGRAM_ID}=deps;
  if(!mintAccount)return {state:'missing',reason:'The mint account was not found on this RPC. It may still be settling.'};
  if(!TOKEN_PROGRAMS.includes(mintAccount.owner.toBase58()))return {state:'mismatch',reason:'The mint is not owned by an SPL token program.'};
  if(!curveAccount||!curveAccount.owner.equals(PUMP_PROGRAM_ID))return {state:'mismatch',reason:'No Pump bonding curve exists for this mint.'};
  let curve;try{curve=PUMP_SDK.decodeBondingCurve(curveAccount);}catch{return {state:'mismatch',reason:'The bonding curve could not be decoded.'};}
- if(curve.creator.toBase58()!==record.creator)return {state:'mismatch',reason:'The bonding curve creator is not the recorded wallet.'};
+ // A creator may move fees to a sharing config; the curve then names that config, which is still this launch.
+ const shared=deps.feeSharingConfigPda?.(new PublicKey(record.mint));
+ if(curve.creator.toBase58()!==record.creator&&!(shared&&curve.creator.equals(shared)))return {state:'mismatch',reason:'The bonding curve creator is not the recorded wallet.'};
  return curve.complete?{state:'graduated',reason:'The curve is complete.'}:{state:'live',reason:'The mint and its curve match the record.'};
 }
 
@@ -91,7 +94,7 @@ export function classifyLaunch(record,{mintAccount,curveAccount},{PUMP_SDK,PUMP_
  * that batch 'unreachable'. Results are written to the registry and returned as {mint: {state, reason}}.
  */
 export async function reconcileLaunches({connection,registry,mints=null,commitment='confirmed'}){
- const {PUMP_SDK,PUMP_PROGRAM_ID,bondingCurvePda}=await loadPumpSdk();
+ const sdk=await loadPumpSdk(),{bondingCurvePda}=sdk;
  const records=(mints?mints.map(m=>registry.get(m)):registry.list()).filter(Boolean),results={};
  for(let i=0;i<records.length;i+=4){
   const batch=records.slice(i,i+4);
@@ -99,7 +102,7 @@ export async function reconcileLaunches({connection,registry,mints=null,commitme
   let accounts;
   try{accounts=await connection.getMultipleAccountsInfo(keys,commitment);}
   catch{for(const r of batch)results[r.mint]={state:'unreachable',reason:'The network could not be reached. Try again.'};continue;}
-  batch.forEach((r,n)=>{results[r.mint]=classifyLaunch(r,{mintAccount:accounts[n*2],curveAccount:accounts[n*2+1]},{PUMP_SDK,PUMP_PROGRAM_ID});});
+  batch.forEach((r,n)=>{results[r.mint]=classifyLaunch(r,{mintAccount:accounts[n*2],curveAccount:accounts[n*2+1]},sdk);});
  }
  for(const [mint,{state}] of Object.entries(results))registry.setState(mint,state);
  return results;

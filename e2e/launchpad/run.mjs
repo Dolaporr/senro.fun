@@ -64,6 +64,10 @@ console.log('REGISTRY stored records:',stored.records.length,'slot',stored.recor
 await p.reload({waitUntil:'networkidle2'});await waitText(p,'Your launches');
 console.log('REGISTRY survives reload:',(await text(p)).includes('Mossback'));
 await click(p,'Check all on-chain');await waitText(p,'Live on Pump');
+await connect(p);await waitText(p,'to graduation',15000).catch(()=>{});
+await p.screenshot({path:path.join(os.tmpdir(),'s10-analytics.png'),fullPage:true});
+const analytics=await text(p);
+console.log('P5 analytics shown:',analytics.includes('to graduation')&&analytics.includes('Market cap'),'| vault shows 0.0123 SOL:',analytics.includes('0.0123 SOL'),'| rules note:',analytics.includes('Anyone can still trade your token directly on Pump'));
 await p.screenshot({path:path.join(os.tmpdir(),'s8-launches.png'),fullPage:true});
 const mint=stored.records[0].mint;
 const studio=await browser.newPage();await studio.setViewport({width:1280,height:900});
@@ -100,6 +104,19 @@ p=await open(4181);await fill(p);await connect(p);
 await click(p,'Review launch');await waitText(p,'Approve and sign');
 await api(4181,'pending');
 console.log('(skipping long unknown-outcome wait in browser; covered by unit tests)');
+await p.close();
+
+// 5b phone browser with no wallet: offers open-in-wallet links back to the launchpad
+p=await browser.newPage();await p.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148');await p.setViewport({width:390,height:844,isMobile:true,hasTouch:true});
+await p.goto('http://localhost:4180/launchpad.html?nowallet',{waitUntil:'networkidle2'});
+await p.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Connect wallet')).click());
+await waitText(p,'Open in Phantom');
+const links=await p.$$eval('.lp-sheet a',a=>a.map(x=>x.href));
+console.log('PHONE links:',links.map(h=>decodeURIComponent(h).replace(/\?ref=.*/,'')).join(' | '));
+await p.screenshot({path:path.join(os.tmpdir(),'m3-phone-wallets.png')});
+await p.close();
+p=await browser.newPage();await p.goto('http://localhost:4180/launchpad.html?connectWallet=1',{waitUntil:'networkidle2'});
+console.log('PHONE return opens picker:',(await text(p)).includes('Connect a wallet'),'| url cleaned:',await p.evaluate(()=>location.search===''));
 await p.close();
 
 // 6 mobile

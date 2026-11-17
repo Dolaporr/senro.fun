@@ -117,19 +117,20 @@ export async function verifyPinned({metadataUri,imageUri,imageBytes,expected,fet
  }catch{throw new HttpError(502,'Stored content could not be verified. Nothing was published.');}
 }
 
-function clientKey(request){return request.headers.get('x-nf-client-connection-ip')??request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()??'unknown';}
+// Only platform-set addresses are trusted; x-forwarded-for is caller-controlled and ignored.
+function clientKey(request,ip){return String(ip||request.headers.get('x-nf-client-connection-ip')||'shared').slice(0,64);}
 
 /**
  * @param request   Web Request (multipart/form-data: name, symbol, description, website, twitter,
  *                  telegram, image, wallet, issuedAt, signature)
  * @param deps      {provider, fetcher, now, seen, ipLimiter, walletLimiter, retries}
  */
-export async function handleUpload(request,{provider,fetcher=fetch,now=Date.now,seen,ipLimiter,walletLimiter,retries}={}){
+export async function handleUpload(request,{provider,fetcher=fetch,now=Date.now,seen,ipLimiter,walletLimiter,retries,ip=null}={}){
  try{
   if(request.method!=='POST')return json({error:'Use POST.'},405);
   const origin=request.headers.get('origin');if(origin&&origin!==new URL(request.url).origin)return json({error:'Cross-origin requests are not allowed.'},403);
   if(!/^multipart\/form-data;/i.test(request.headers.get('content-type')??''))throw new HttpError(415,'Send multipart/form-data.');
-  if(ipLimiter&&!ipLimiter(clientKey(request)))throw new HttpError(429,'Too many uploads. Try again later.');
+  if(ipLimiter&&!ipLimiter(clientKey(request,ip)))throw new HttpError(429,'Too many uploads. Try again later.');
   if(!provider)throw new HttpError(503,'Upload provider is not configured.');
   const body=await readBounded(request,MAX_BODY_BYTES);
   let form;try{form=await new Response(body,{headers:{'content-type':request.headers.get('content-type')}}).formData();}catch{throw new HttpError(400,'Malformed upload.');}

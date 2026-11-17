@@ -28,3 +28,12 @@ test('phone and iPad desktop-mode detection does not imply an installed provider
  assert.equal(isMobileBrowser({userAgent:'Chrome',platform:'MacIntel',maxTouchPoints:0}),false);
  assert.equal(isMobileBrowser(undefined),false);
 });
+
+test('launchpad handoff returns to the launchpad page without the studio hash',()=>{
+ for(const wallet of MOBILE_WALLETS){
+  const link=new URL(walletBrowseLink(wallet.id,'https://senro.fun/launchpad.html?draft=1#x',{hash:''}));
+  const encoded=link.pathname.slice(new URL(wallet.browse).pathname.length);
+  assert.equal(decodeURIComponent(encoded),'https://senro.fun/launchpad.html?connectWallet=1');
+ }
+ assert.deepEqual(consumeWalletHandoff('https://senro.fun/launchpad.html?connectWallet=1'),{open:true,cleanPath:'/launchpad.html'});
+});

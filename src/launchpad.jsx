@@ -6,6 +6,8 @@ import {getWallets} from '@wallet-standard/app';
 import {validateLaunch} from './launchpad-model.mjs';
 import {createLaunchFlow,DISABLED_REASON} from './launchpad-flow.mjs';
 import {createLaunchConnection,uploadLaunchMetadata} from './launch-client.mjs';
+import {MOBILE_WALLETS,walletBrowseLink,isMobileBrowser,consumeWalletHandoff} from './mobile-wallet.mjs';
+import {readCreatorAnalytics,formatSol} from './launch-analytics.mjs';
 import {loadRegistry,saveRegistry,reconcileLaunches,studioLink} from './launch-registry.mjs';
 import './launchpad.css';
 
@@ -30,6 +32,11 @@ const STEPS=[
 ];
 const POSITION={uploading:[0],building:[1],simulating:[2],ready:[3],blocked:[3],'simulation-failed':[2,true],signing:[4],submitting:[5],confirming:[5],launched:[7],failed:[5,true],expired:[5,true],unknown:[5,true],unverified:[6,true]};
 
+function LaunchStats({s}){
+ const pct=(s.progressBps/100).toFixed(s.progressBps<100?2:1);
+ return <span className="lp-stats"><span className="lp-progress" role="progressbar" aria-valuenow={s.progressBps/100} aria-valuemin="0" aria-valuemax="100" aria-label="Bonding curve progress"><i style={{width:`${Math.max(1,s.progressBps/100)}%`}}/></span><span>{s.complete?'Graduated':`${pct}% to graduation`}</span><span>Market cap {formatSol(s.marketCapLamports)}</span>{s.sharedFees&&<span>Fees shared</span>}</span>;
+}
+
 function LaunchArt({record}){const [failed,setFailed]=useState(false);return <span className="lp-launch-art">{record.imageUri&&!failed?<img src={record.imageUri} alt="" loading="lazy" width="44" height="44" onError={()=>setFailed(true)}/>:<span>{record.symbol.slice(0,2)}</span>}</span>}
 
 function Mark(){return <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M23 9H12a4 4 0 0 0 0 8h8a4 4 0 0 1 0 8H9" stroke="currentColor" strokeWidth="4" strokeLinecap="square"/></svg>}
@@ -46,13 +53,17 @@ function App(){
  const [form,setForm]=useState(initial),[sheet,setSheet]=useState(false),[wallets,setWallets]=useState([]),[picker,setPicker]=useState(false),[connected,setConnected]=useState(null),[walletError,setWalletError]=useState(''),[flowState,setFlowState]=useState({stage:'idle'}),[pending,setPending]=useState(readPending),[pendingNote,setPendingNote]=useState(''),[imageUrl,setImageUrl]=useState('');
  const flowRef=useRef(null),lastIndex=useRef(0),connection=useMemo(()=>createLaunchConnection(),[]);
  const registry=useMemo(()=>loadRegistry(),[]),[launches,setLaunches]=useState(()=>registry.list()),[shown,setShown]=useState(8),[checking,setChecking]=useState(false),[checkNote,setCheckNote]=useState('');
+ const [stats,setStats]=useState(null),[statsBusy,setStatsBusy]=useState(false),[statsError,setStatsError]=useState('');
  const syncLaunches=()=>{saveRegistry(registry);setLaunches(registry.list())};
  async function checkLaunches(mints){setChecking(true);setCheckNote('');try{const out=await reconcileLaunches({connection,registry,mints});if(Object.values(out).every(r=>r.state==='unreachable'))setCheckNote('The network could not be reached. Try again.');}catch{setCheckNote('The check could not run. Try again.');}syncLaunches();setChecking(false);}
+ const mobile=useMemo(()=>isMobileBrowser(globalThis.navigator),[]);
  const result=validateLaunch(form),account=connected?.account.address??'';
  const stage=flowState.stage,busy=['uploading','building','simulating','signing','submitting','confirming'].includes(stage);
  const position=POSITION[stage];if(position)lastIndex.current=Math.min(position[0],STEPS.length-1);
 
  useEffect(()=>{if(!form.image){setImageUrl('');return;}const url=URL.createObjectURL(form.image);setImageUrl(url);return()=>URL.revokeObjectURL(url)},[form.image]);
+ // Returning from a wallet's in-app browser: open the connect sheet once, then clean the URL.
+ useEffect(()=>{try{const h=consumeWalletHandoff(location.href);if(h.open){setPicker(true);history.replaceState(history.state,'',h.cleanPath);}}catch{}},[]);
  useEffect(()=>{const api=getWallets(),refresh=()=>setWallets(api.get().filter(w=>w.chains.some(c=>c.startsWith('solana:'))&&w.features['standard:connect']));refresh();const a=api.on('register',refresh),b=api.on('unregister',refresh);return()=>{a();b();}},[]);
  // A new wallet connection means a new flow; the old one is cancelled so nothing in flight can complete.
  useEffect(()=>{
@@ -64,6 +75,9 @@ function App(){
   return()=>{off();flow.cancel();};
  },[connected,connection,registry]);
 
+ const mine=launches.filter(r=>r.creator===account);
+ async function loadStats(){if(!account||!mine.length)return;setStatsBusy(true);setStatsError('');try{setStats(await readCreatorAnalytics({connection,creator:account,mints:mine.map(r=>r.mint)}));}catch(e){setStatsError(String(e.message??e).slice(0,160));}setStatsBusy(false);}
+ useEffect(()=>{setStats(null);setStatsError('');if(account&&mine.length)loadStats();},[account,launches.length]);
  function change(key,value){flowRef.current?.cancel();setForm(v=>({...v,[key]:value}));setSheet(false)}
  async function connect(w){setWalletError('');try{const out=await w.features['standard:connect'].connect();const next=(out.accounts??w.accounts).find(a=>a.chains.includes('solana:mainnet'));if(!next)throw Error('This wallet has no Solana mainnet account.');setConnected({wallet:w,account:next});setPicker(false)}catch(e){setWalletError(String(e.message??e).slice(0,180))}}
  async function checkPending(){setPendingNote('Checking…');try{const r=await connection.getSignatureStatuses([pending.signature],{searchTransactionHistory:true});const st=r.value[0];setPendingNote(!st?'Not found yet. It may still land, or it may have expired. Do not send again until this shows a final result.':st.err?'The transaction failed on-chain.':`Status: ${st.confirmationStatus}.`);}catch(e){setPendingNote('Could not check: '+String(e.message??e).slice(0,120));}}
@@ -110,12 +124,18 @@ function App(){
     </div>
     {launches.length>0&&<section className="lp-section lp-launches" aria-label="Your launches">
      <h2>Your launches<small>kept in this browser</small></h2>
+     {connected&&mine.length>0&&<div className="lp-creator">
+      <div><span>Creator fees waiting in your Pump vault</span><strong>{stats?formatSol(stats.claimableLamports):statsBusy?'Reading…':'Not read yet'}</strong><small>Shared across every Pump coin this wallet created. Claim them on Pump; SENRO takes no share.</small></div>
+      <button className="lp-ghost" disabled={statsBusy} onClick={loadStats}>{statsBusy?'Reading…':'Refresh numbers'}</button>
+      {statsError&&<span className="lp-err">{statsError}</span>}
+     </div>}
      <ul className="lp-launch-list">{registry.page({limit:shown}).items.map(r=><li className="lp-launch" key={r.mint}>
       <LaunchArt record={r}/>
-      <div><b>{r.name} <em>{r.symbol}</em></b><small><code>{short(r.mint,5)}</code> in slot {r.slot.toLocaleString('en-US')}</small></div>
+      <div><b>{r.name} <em>{r.symbol}</em></b><small><code>{short(r.mint,5)}</code> in slot {r.slot.toLocaleString('en-US')}</small>{stats?.launches[r.mint]?.available&&<LaunchStats s={stats.launches[r.mint]}/>}</div>
       <span className="lp-launch-state" data-state={r.state}>{STATE_LABEL[r.state]}</span>
       <span className="lp-launch-actions"><a href={`https://solscan.io/token/${r.mint}`} target="_blank" rel="noreferrer">Solscan</a><a href={studioLink(r.mint)}>Simulate a buy</a><button disabled={checking} onClick={()=>checkLaunches([r.mint])}>Check</button></span>
      </li>)}</ul>
+     <p className="lp-rules-note">Want limits on your own buys? Set rules in the <a href="/#studio">SENRO studio</a>. They apply only to buys you make through SENRO. Anyone can still trade your token directly on Pump.</p>
      <div className="lp-launch-foot">{launches.length>shown&&<button className="lp-ghost" onClick={()=>setShown(n=>n+8)}>Show more</button>}<button className="lp-ghost" disabled={checking} onClick={()=>checkLaunches(null)}>{checking?'Checking…':'Check all on-chain'}</button>{checkNote&&<span className="lp-err">{checkNote}</span>}</div>
     </section>}
     {pending&&<div className="lp-note lp-pending"><Info size={16}/><span>A launch from this session is still unresolved: <code>{short(pending.signature,8)}</code> <a href={`https://solscan.io/tx/${pending.signature}`} target="_blank" rel="noreferrer">View on Solscan <ExternalLink size={11}/></a><button onClick={checkPending}>Check status</button>{pendingNote&&<><br/>{pendingNote}</>}</span></div>}
@@ -167,7 +187,9 @@ function App(){
 
   {picker&&<div className="lp-overlay" onClick={()=>setPicker(false)}><section className="lp-sheet" role="dialog" aria-modal="true" aria-label="Connect wallet" onClick={e=>e.stopPropagation()}>
    <h2>Connect a wallet</h2><p>Pick the wallet you want to launch from. It never leaves your browser.</p>
-   {wallets.length?wallets.map(w=><button key={w.name} className="lp-ghost" style={{display:'flex',width:'100%',alignItems:'center',gap:12,marginBottom:10}} onClick={()=>connect(w)}>{w.icon&&<img src={w.icon} alt="" width="22" height="22"/>}{w.name}</button>):<div className="lp-note"><Info size={16}/><span>No Solana wallet found. Open this page in a wallet browser, or install a wallet extension and reload.</span></div>}
+   {wallets.map(w=><button key={w.name} className="lp-wallet-choice" onClick={()=>connect(w)}>{w.icon&&<img src={w.icon} alt="" width="22" height="22"/>}{w.name}</button>)}
+   {!wallets.length&&mobile&&<><p className="lp-sheet-sub">Phone browsers can't reach wallet apps directly. Open this page inside your wallet's browser, then connect there.</p>{MOBILE_WALLETS.map(w=>{let href=null;try{href=walletBrowseLink(w.id,location.href,{hash:''});}catch{}return href?<a key={w.id} className="lp-wallet-choice" href={href} rel="noreferrer"><img src={w.icon} alt="" width="22" height="22"/>Open in {w.name}</a>:null;})}</>}
+   {!wallets.length&&!mobile&&<div className="lp-note"><Info size={16}/><span>No Solana wallet found. Install a wallet extension such as Phantom or Solflare, then reload this page.</span></div>}
    {walletError&&<div className="lp-note" data-tone="bad"><Info size={16}/><span>{walletError}</span></div>}
   </section></div>}
 
