@@ -164,10 +164,10 @@ const inFlight=new Map();
 
 /**
  * Sends the reviewed, fully signed transaction. Rejects anything that is not byte-identical to the
- * simulated message, then confirms. Never retries: transport errors carry the locally derived
+ * simulated message, then polls for confirmation. Never retries: transport errors carry the locally derived
  * signature so the UI can reconcile instead of resubmitting.
  */
-export async function submitLaunch({connection,plan,binding,simulation,signedTransaction,now=Date.now,onSubmitted=()=>{}}){
+export async function submitLaunch({connection,plan,binding,simulation,signedTransaction,now=Date.now,onSubmitted=()=>{},wait,intervalMs,maxMs}){
  if(!(signedTransaction instanceof VersionedTransaction))throw Error('Signed transaction is required.');
  const actualHash=await launchMessageHash(signedTransaction);
  assertSimulatedLaunch({plan,simulation,expectedMessageHash:binding.messageHash,actualMessageHash:actualHash,now:now()});
@@ -188,15 +188,33 @@ export async function submitLaunch({connection,plan,binding,simulation,signedTra
   const status=await connection.getSignatureStatus(signature,{searchTransactionHistory:true}).catch(()=>null);
   if(!status?.value){inFlight.delete(binding.messageHash);const e=Error(`Submission failed: ${error.message}`);e.signature=signature;throw e;}
  }
- try{
-  const result=await connection.confirmTransaction({signature,blockhash:binding.blockhash,lastValidBlockHeight:binding.lastValidBlockHeight},'confirmed');
-  if(result.value?.err)return {status:'failed',signature,err:result.value.err};
-  return {status:'confirmed',signature};
- }catch(error){
-  const status=await connection.getSignatureStatus(signature,{searchTransactionHistory:true}).catch(()=>null);
-  if(status?.value&&!status.value.err&&['confirmed','finalized'].includes(status.value.confirmationStatus))return {status:'confirmed',signature};
-  if(status?.value?.err)return {status:'failed',signature,err:status.value.err};
-  return {status:'expired',signature,detail:error.message};
+ return waitForConfirmation({connection,signature,lastValidBlockHeight:binding.lastValidBlockHeight,wait,intervalMs,maxMs});
+}
+
+/**
+ * Polls signature status and block height; no WebSocket needed, so it works through an HTTP-only
+ * relay. Returns confirmed / failed / expired, or 'unknown' when the time budget ends while the
+ * blockhash is still valid (the UI must keep reconciling by signature, never resubmit).
+ */
+export async function waitForConfirmation({connection,signature,lastValidBlockHeight,wait=ms=>new Promise(r=>setTimeout(r,ms)),intervalMs=2000,maxMs=90000}){
+ const deadline=Date.now()+maxMs;
+ for(;;){
+  const response=await connection.getSignatureStatuses([signature],{searchTransactionHistory:true}).catch(()=>null);
+  const status=response?.value?.[0];
+  if(status){
+   if(status.err)return {status:'failed',signature,err:status.err};
+   if(['confirmed','finalized'].includes(status.confirmationStatus))return {status:'confirmed',signature};
+  }
+  const height=await connection.getBlockHeight('confirmed').catch(()=>null);
+  if(height!==null&&height>lastValidBlockHeight){
+   const last=await connection.getSignatureStatuses([signature],{searchTransactionHistory:true}).catch(()=>null);
+   const final=last?.value?.[0];
+   if(final&&!final.err&&['confirmed','finalized'].includes(final.confirmationStatus))return {status:'confirmed',signature};
+   if(final?.err)return {status:'failed',signature,err:final.err};
+   return {status:'expired',signature};
+  }
+  if(Date.now()>=deadline)return {status:'unknown',signature};
+  await wait(intervalMs);
  }
 }
 

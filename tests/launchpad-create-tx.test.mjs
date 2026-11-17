@@ -52,7 +52,8 @@ function mockConnection(over={}){
   getFeeForMessage:async()=>({value:5000}),
   simulateTransaction:async(tx,config)=>{calls.push(['simulate',config]);return {context:{slot:42},value:{err:null,logs:['ok'],unitsConsumed:123456,accounts:config.accounts.addresses.map((a,i)=>({lamports:i===0?1_970_000_000:1_000_000,owner:'11111111111111111111111111111111',data:['','base64']}))}};},
   sendRawTransaction:async(wire)=>{calls.push(['send']);return VersionedTransaction.deserialize(wire).signatures[0]?bs58ish(VersionedTransaction.deserialize(wire).signatures[0]):'';},
-  confirmTransaction:async()=>({value:{err:null}}),
+  getSignatureStatuses:async()=>({value:[{err:null,confirmationStatus:'confirmed'}]}),
+  getBlockHeight:async()=>LAST_VALID-10,
   getSignatureStatus:async()=>({value:null}),
   ...over};
  return c;
@@ -205,21 +206,21 @@ test('MOCK submit gates: stale, failed, foreign or missing-signature input never
  await assert.rejects(submitLaunch({connection:stale,plan:ctx.plan,binding:ctx.binding,simulation:simulationFor(ctx),signedTransaction:signed,now:()=>1500}),/blockhash expired/);
 });
 
-test('MOCK submit outcomes: rpc failure keeps the signature, on-chain failure and expiry are reported, late confirmation is reconciled',async()=>{
- const base=await built();
- const signed=await fullySigned(base);
- const args=conn=>({connection:conn,plan:base.plan,binding:base.binding,simulation:simulationFor(base),signedTransaction:signed,now:()=>1500});
- const sendFails=mockConnection({sendRawTransaction:async()=>{throw Error('node unavailable')}});
- await assert.rejects(submitLaunch(args(sendFails)),e=>/Submission failed/.test(e.message)&&typeof e.signature==='string');
- const again=await built();const signed2=await fullySigned(again);
- const failed=await submitLaunch({connection:mockConnection({confirmTransaction:async()=>({value:{err:{InstructionError:[0,'Custom']}}})}),plan:again.plan,binding:again.binding,simulation:simulationFor(again),signedTransaction:signed2,now:()=>1500});
- assert.equal(failed.status,'failed');
- const third=await built();const signed3=await fullySigned(third);
- const expired=await submitLaunch({connection:mockConnection({confirmTransaction:async()=>{throw Error('block height exceeded')}}),plan:third.plan,binding:third.binding,simulation:simulationFor(third),signedTransaction:signed3,now:()=>1500});
- assert.equal(expired.status,'expired');
- const fourth=await built();const signed4=await fullySigned(fourth);
- const late=await submitLaunch({connection:mockConnection({confirmTransaction:async()=>{throw Error('timeout')},getSignatureStatus:async()=>({value:{err:null,confirmationStatus:'confirmed'}})}),plan:fourth.plan,binding:fourth.binding,simulation:simulationFor(fourth),signedTransaction:signed4,now:()=>1500});
- assert.equal(late.status,'confirmed');
+test('MOCK submit outcomes: rpc failure keeps the signature; on-chain failure, expiry, late confirmation and unknown are reported',async()=>{
+ const noWait={wait:async()=>{},intervalMs:0};
+ const run=async(over,opts={})=>{const c=await built();const signed=await fullySigned(c);return submitLaunch({connection:mockConnection(over),plan:c.plan,binding:c.binding,simulation:simulationFor(c),signedTransaction:signed,now:()=>1500,...noWait,...opts});};
+ const base=await built();const signed=await fullySigned(base);
+ await assert.rejects(submitLaunch({connection:mockConnection({sendRawTransaction:async()=>{throw Error('node unavailable')}}),plan:base.plan,binding:base.binding,simulation:simulationFor(base),signedTransaction:signed,now:()=>1500,...noWait}),e=>/Submission failed/.test(e.message)&&typeof e.signature==='string');
+ assert.equal((await run({getSignatureStatuses:async()=>({value:[{err:{InstructionError:[0,'Custom']},confirmationStatus:'confirmed'}]})})).status,'failed');
+ assert.equal((await run({getSignatureStatuses:async()=>({value:[null]}),getBlockHeight:async()=>LAST_VALID+5})).status,'expired');
+ let calls=0;
+ const late=await run({getSignatureStatuses:async()=>({value:[++calls<3?null:{err:null,confirmationStatus:'finalized'}]}),getBlockHeight:async()=>LAST_VALID-1});
+ assert.equal(late.status,'confirmed');assert.ok(calls>=3,'polled until the status appeared');
+ let n=0;
+ const raced=await run({getSignatureStatuses:async()=>({value:[++n<2?null:{err:null,confirmationStatus:'confirmed'}]}),getBlockHeight:async()=>LAST_VALID+5});
+ assert.equal(raced.status,'confirmed','a transaction that lands right at expiry is reconciled, not reported as expired');
+ const unknown=await run({getSignatureStatuses:async()=>({value:[null]}),getBlockHeight:async()=>LAST_VALID-1},{maxMs:-1});
+ assert.equal(unknown.status,'unknown');
 });
 
 async function curveAccount(plan,{creator=plan.creator,complete=false,owner=PUMP_PROGRAM}={}){
