@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {prepareLaunchPlan,assertSimulatedLaunch} from '../src/launchpad-plan.mjs';
+const creator='11111111111111111111111111111111',mint='So11111111111111111111111111111111111111112';
+const base={form:{name:'Orbit',symbol:'ORB'},creator,mint,metadataUri:'https://example.com/orbit.json'};
+test('valid launch plans remain non-executable',()=>{const p=prepareLaunchPlan(base);assert.equal(p.execution,'not-enabled');assert.equal(p.initialBuyLamports,'0');assert.equal(p.chain,'solana')});
+test('reject missing or malformed metadata URIs',()=>{for(const metadataUri of ['', 'http://example.com/a','https://user:pass@example.com/a','javascript:alert(1)'])assert.throws(()=>prepareLaunchPlan({...base,metadataUri}))});
+test('reject invalid mint and creator',()=>{assert.throws(()=>prepareLaunchPlan({...base,mint:'abc'}));assert.throws(()=>prepareLaunchPlan({...base,mint:creator}))});
+test('reject malformed or overflowing buy values',()=>{for(const initialBuyLamports of ['-1','1.2','01','18446744073709551616'])assert.throws(()=>prepareLaunchPlan({...base,initialBuyLamports}))});
+test('reject unsupported networks',()=>assert.throws(()=>prepareLaunchPlan({...base,cluster:'testnet'})));
+test('accept only fresh successful simulation of unchanged message',()=>{const plan=prepareLaunchPlan(base),simulation={err:null,unitsConsumed:100,simulatedAt:100000};assert.equal(assertSimulatedLaunch({plan,simulation,expectedMessageHash:'abc',actualMessageHash:'abc',now:100001}),true);assert.throws(()=>assertSimulatedLaunch({plan,simulation,expectedMessageHash:'abc',actualMessageHash:'def',now:100001}));assert.throws(()=>assertSimulatedLaunch({plan,simulation,expectedMessageHash:'abc',actualMessageHash:'abc',now:131000}));assert.throws(()=>assertSimulatedLaunch({plan,simulation:{...simulation,err:{InstructionError:[0,'Custom']}},expectedMessageHash:'abc',actualMessageHash:'abc',now:100001}))});

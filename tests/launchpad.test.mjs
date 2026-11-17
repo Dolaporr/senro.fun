@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {validateLaunch,launchChecklist,MAX_IMAGE_BYTES} from '../src/launchpad-model.mjs';
+test('valid metadata is normalized',()=>{const r=validateLaunch({name:'  Orbit ',symbol:'ORB',description:'hello'});assert.equal(r.valid,true);assert.equal(r.metadata.name,'Orbit')});
+test('invalid names and symbols fail',()=>{for(const input of [{name:'a',symbol:'ORB'},{name:'Valid',symbol:'A!'},{name:'Valid',symbol:''}])assert.equal(validateLaunch(input).valid,false)});
+test('social links require HTTPS',()=>{assert.equal(validateLaunch({name:'Orbit',symbol:'ORB',website:'http://example.com'}).valid,false);assert.equal(validateLaunch({name:'Orbit',symbol:'ORB',website:'https://example.com'}).valid,true)});
+test('image validation enforces mime and size',()=>{assert.equal(validateLaunch({name:'Orbit',symbol:'ORB',image:{type:'image/svg+xml',size:100}}).valid,false);assert.equal(validateLaunch({name:'Orbit',symbol:'ORB',image:{type:'image/png',size:MAX_IMAGE_BYTES+1}}).valid,false)});
+test('readiness never reports launch as complete',()=>{const list=launchChecklist({wallet:'abc'});assert.equal(list.at(-1).done,false);assert.equal(list[1].done,true)});

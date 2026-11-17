@@ -9,7 +9,14 @@
     "test": "node --test tests/*.test.mjs",
     "build:netlify": "vite build",
     "check:netlify": "node scripts/validate-netlify.mjs",
-    "check:live": "node scripts/check-live-site.mjs"
+    "check:live": "node scripts/check-live-site.mjs",
+    "e2e:launchpad": "vite build && VITE_LAUNCH_ENABLED=true vite build --outDir \"${LIVE_DIST:-/tmp/senro-dist-live}\" --emptyOutDir && LIVE_DIST=\"${LIVE_DIST:-/tmp/senro-dist-live}\" node e2e/launchpad/run.mjs"
+  },
+  "imports": {
+    "#pump-sdk": {
+      "node": "./src/pump-sdk-node.cjs",
+      "default": "@pump-fun/pump-sdk"
+    }
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",
@@ -24,6 +31,7 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "puppeteer-core": "^25.17.0",
     "vite": "8.3.6"
   }
 }

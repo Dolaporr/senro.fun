@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {createTokenMetadata,verifyMetadataDocument} from '../src/launchpad-metadata.mjs';
+const form={name:'Orbit',symbol:'ORB'};
+test('constructs canonical token metadata',()=>{const m=createTokenMetadata(form,'https://cdn.example.com/image.png');assert.equal(m.symbol,'ORB');assert.equal(m.showName,true)});
+test('rejects missing or unsafe image URI',()=>{assert.throws(()=>createTokenMetadata(form,'http://example.com/a'));assert.throws(()=>createTokenMetadata(form,'javascript:alert(1)'))});
+test('verifies remote JSON without real network calls',async()=>{const fetcher=async()=>({ok:true,headers:{get:()=>null},text:async()=>JSON.stringify({...form,image:'https://example.com/image.png'})});const result=await verifyMetadataDocument('https://example.com/token.json',{fetcher});assert.equal(result.name,'Orbit')});
+test('rejects invalid metadata and oversized responses',async()=>{const fetcher=async()=>({ok:true,headers:{get:()=>null},text:async()=>'{bad'});await assert.rejects(verifyMetadataDocument('https://example.com/a',{fetcher}));const large=async()=>({ok:true,headers:{get:()=>20000},text:async()=>''});await assert.rejects(verifyMetadataDocument('https://example.com/a',{fetcher:large}))});
