@@ -80,6 +80,11 @@ await studio.close();
 // landing entry
 const landing=await browser.newPage();await landing.setViewport({width:1280,height:900});
 await landing.goto('http://localhost:4181/',{waitUntil:'networkidle2'});
+console.log('LANDING header button visible:',await landing.$eval('.landing-header-launch',a=>{const r=a.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.width>0}));
+await landing.screenshot({path:path.join(os.tmpdir(),'s11-landing-top.png')});
+const phone=await browser.newPage();await phone.setViewport({width:390,height:844,isMobile:true});await phone.goto('http://localhost:4181/',{waitUntil:'networkidle2'});
+console.log('LANDING phone button visible:',await phone.$eval('.landing-header-launch',a=>{const r=a.getBoundingClientRect();return r.top>=0&&r.right<=innerWidth&&r.width>0}),'| overflow:',await phone.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1));
+await phone.screenshot({path:path.join(os.tmpdir(),'m4-landing-top.png')});await phone.close();
 console.log('LANDING links to launchpad:',await landing.$$eval('a[href="/launchpad.html"]',a=>a.length));
 await landing.evaluate(()=>document.getElementById('launchpad')?.scrollIntoView());await new Promise(r=>setTimeout(r,600));
 await landing.screenshot({path:path.join(os.tmpdir(),'s9-landing-launchpad.png')});
