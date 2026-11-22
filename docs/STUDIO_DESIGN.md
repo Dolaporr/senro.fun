@@ -1,4 +1,4 @@
-# SENRO studio — Flow with intention
+# Nush studio — Flow with intention
 
 ## Visual direction
 

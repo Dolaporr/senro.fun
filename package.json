@@ -1,5 +1,5 @@
 {
-  "name": "senro-rule-studio",
+  "name": "nush",
   "private": true,
   "type": "module",
   "version": "0.2.0",
@@ -10,7 +10,7 @@
     "build:netlify": "vite build",
     "check:netlify": "node scripts/validate-netlify.mjs",
     "check:live": "node scripts/check-live-site.mjs",
-    "e2e:launchpad": "vite build && VITE_LAUNCH_ENABLED=true vite build --outDir \"${LIVE_DIST:-/tmp/senro-dist-live}\" --emptyOutDir && LIVE_DIST=\"${LIVE_DIST:-/tmp/senro-dist-live}\" node e2e/launchpad/run.mjs"
+    "e2e:launchpad": "node e2e/launchpad/build.mjs && node e2e/launchpad/run.mjs"
   },
   "imports": {
     "#pump-sdk": {

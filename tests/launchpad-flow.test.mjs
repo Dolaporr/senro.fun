@@ -17,7 +17,7 @@ import {base58} from '../src/guarded-trade.mjs';
 const sdk=await loadPumpSdk();
 const TOKEN_2022='TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 const PNG=Uint8Array.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,...Array(64).fill(1)]);
-const ORIGIN='https://senro.test';
+const ORIGIN='https://nush.test';
 const BH=new PublicKey(new Uint8Array(32).fill(7)).toBase58();
 const b64=u8=>Buffer.from(u8).toString('base64');
 

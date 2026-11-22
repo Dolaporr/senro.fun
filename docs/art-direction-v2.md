@@ -1,4 +1,4 @@
-# SENRO background direction
+# Nush background direction
 
 The generated chrome sculpture and 3D icon atlas were removed from the website on November 10, 2026, following the requested Clock In background reference.
 

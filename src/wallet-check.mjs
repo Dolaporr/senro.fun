@@ -5,7 +5,7 @@ import {validateWalletAccount,walletCapabilities} from './wallet-session.mjs';
 export function createWalletChallenge({address,origin,now=Date.now()}){
  const url=new URL(origin);if(url.origin!==origin||url.protocol!=='https:'&&!(url.protocol==='http:'&&['localhost','127.0.0.1','terminal.local'].includes(url.hostname)))throw Error('Wallet check requires a secure app origin.');
  const wallet=new PublicKey(address).toBase58(),nonce=hex(crypto.getRandomValues(new Uint8Array(32))),expiresAt=now+120000;
- const message=['SENRO wallet compatibility check','Purpose: test off-chain message signing only.','This is not a trade, transfer, token approval or login request.',`Origin: ${origin}`,`Wallet: ${wallet}`,`Nonce: ${nonce}`,`Issued at: ${new Date(now).toISOString()}`,`Expires at: ${new Date(expiresAt).toISOString()}`].join('\n');
+ const message=['Nush wallet compatibility check','Purpose: test off-chain message signing only.','This is not a trade, transfer, token approval or login request.',`Origin: ${origin}`,`Wallet: ${wallet}`,`Nonce: ${nonce}`,`Issued at: ${new Date(now).toISOString()}`,`Expires at: ${new Date(expiresAt).toISOString()}`].join('\n');
  return Object.freeze({address:wallet,origin,nonce,message,issuedAt:now,expiresAt});
 }
 const used=new WeakSet();

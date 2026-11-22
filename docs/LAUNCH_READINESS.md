@@ -1,15 +1,15 @@
-# SENRO readiness review — 6 November 2026
+# Nush readiness review — 6 November 2026
 
 Current decision: do not launch live trading. The simulation and rule-design product has a working local release candidate, with live Netlify deployment checks passing and real-wallet checks still required. This review is not an independent security audit.
 
 ## Landing page
 
-The homepage now introduces SENRO, has a working local trade-cap example, explains the three-step flow and links into Studio at `/#studio`. Rule sets and Activity have direct hash links. Browser back/forward navigation is supported. The landing page explicitly describes the current simulation-only release and does not imply deployed enforcement.
+The homepage now introduces Nush, has a working local trade-cap example, explains the three-step flow and links into Studio at `/#studio`. Rule sets and Activity have direct hash links. Browser back/forward navigation is supported. The landing page explicitly describes the current simulation-only release and does not imply deployed enforcement.
 
 ## Fixes from this review
 
 - Mobile flow artwork has its own centered canvas composition instead of negative horizontal insets. The complete gate was observed in a 400px browser iframe viewport. This is a real CSS viewport check, not an iOS/Android device test.
-- Original SENRO SVG favicon, Apple touch icon and 192/512px app icons are included with a web manifest. No offline execution is promised.
+- Original Nush SVG favicon, Apple touch icon and 192/512px app icons are included with a web manifest. No offline execution is promised.
 - Netlify gets a dedicated static build, committed configuration and a native function at `/api/solana`, using the shared tested read-only handler. The prior live Netlify endpoint returned 404; homepage success did not mean the backend existed.
 - The relay rejects oversized streamed bodies before accumulating the complete payload and cannot forward signed or broadcast transactions.
 - A full saved-rule library refuses a new copy instead of silently deleting an older copy. Storage failure is visible; malformed revision metadata falls back to a safe integer.

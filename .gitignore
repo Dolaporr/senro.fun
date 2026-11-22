@@ -15,4 +15,4 @@ __pycache__/
 *.py[cod]
 
 # Local deployment configuration
-.senro-local/
+.nush-local/

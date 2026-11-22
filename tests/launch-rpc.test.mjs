@@ -19,7 +19,7 @@ async function launch({sign=false}={}){
 }
 const sim=(tx,over={})=>({jsonrpc:'2.0',id:1,method:'simulateTransaction',params:[b64(tx),{encoding:'base64',sigVerify:false,replaceRecentBlockhash:false,commitment:'confirmed',...over}]});
 const send=(tx,over={})=>({jsonrpc:'2.0',id:1,method:'sendTransaction',params:[b64(tx),{encoding:'base64',skipPreflight:false,maxRetries:0,...over}]});
-const post=(body,{headers={}}={})=>new Request('https://senro.test/api/launch-rpc',{method:'POST',headers:{'content-type':'application/json',...headers},body:typeof body==='string'?body:JSON.stringify(body)});
+const post=(body,{headers={}}={})=>new Request('https://nush.test/api/launch-rpc',{method:'POST',headers:{'content-type':'application/json',...headers},body:typeof body==='string'?body:JSON.stringify(body)});
 const rejects=(body,pattern)=>assert.rejects(validateLaunchRpc(body),pattern);
 
 test('a real create_v2 launch passes inspection; simulation needs no signatures, sending needs both',async()=>{
@@ -108,11 +108,11 @@ test('method allow-list: reads pass with limits; everything else, including batc
 test('HTTP layer: method, origin, size, bad JSON',async()=>{
  const ok={jsonrpc:'2.0',id:1,method:'getBlockHeight',params:[]};
  const fetcher=async()=>new Response(JSON.stringify({jsonrpc:'2.0',id:1,result:5}));
- assert.equal((await handleLaunchRpc(new Request('https://senro.test/api/launch-rpc'),fetcher)).status,405);
+ assert.equal((await handleLaunchRpc(new Request('https://nush.test/api/launch-rpc'),fetcher)).status,405);
  assert.equal((await handleLaunchRpc(post(ok,{headers:{origin:'https://evil.test'}}),fetcher)).status,403);
  assert.equal((await handleLaunchRpc(post('{nope'),fetcher)).status,400);
  assert.equal((await handleLaunchRpc(post('x'.repeat(9000)),fetcher)).status,413);
- const good=await handleLaunchRpc(post(ok,{headers:{origin:'https://senro.test'}}),fetcher);
+ const good=await handleLaunchRpc(post(ok,{headers:{origin:'https://nush.test'}}),fetcher);
  assert.equal(good.status,200);assert.equal((await good.json()).result,5);
  assert.equal(good.headers.get('cache-control'),'no-store');
 });
@@ -173,7 +173,7 @@ test('sends are limited to a handful per connection',async()=>{
 });
 
 test('client key trusts only platform addresses',()=>{
- const req=h=>new Request('https://senro.test/api/launch-rpc',{headers:h});
+ const req=h=>new Request('https://nush.test/api/launch-rpc',{headers:h});
  assert.equal(clientKey(req({'x-forwarded-for':'6.6.6.6'})),'shared');
  assert.equal(clientKey(req({'x-nf-client-connection-ip':'5.5.5.5','x-forwarded-for':'6.6.6.6'})),'5.5.5.5');
  assert.equal(clientKey(req({}),'7.7.7.7'),'7.7.7.7');

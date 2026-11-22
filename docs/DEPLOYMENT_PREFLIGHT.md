@@ -14,7 +14,7 @@ node scripts/deployment-preflight.mjs \
   --artifact protocol/target/deploy/senro_guard.so
 ```
 
-Use `--reference` when examining an old/local test build. Set `SENRO_RPC_URL` privately if necessary. The default is Solana's public mainnet endpoint. The script requires HTTPS, checks the genesis hash, validates the ELF header and reports the executable hash, account sizes, wallet balance and rent returned by RPC. It cannot establish deployment readiness from an arbitrary ELF; output always sets `readyToDeploy: false`.
+Use `--reference` when examining an old/local test build. Set `Nush_RPC_URL` privately if necessary. The default is Solana's public mainnet endpoint. The script requires HTTPS, checks the genesis hash, validates the ELF header and reports the executable hash, account sizes, wallet balance and rent returned by RPC. It cannot establish deployment readiness from an arbitrary ELF; output always sets `readyToDeploy: false`.
 
 By default the estimate allocates exactly the executable length. If the selected CLI command reserves more program capacity, pass the matching `--allocation-bytes` value. A CLI deployment using different allocation may cost more. The script does not infer CLI defaults.
 

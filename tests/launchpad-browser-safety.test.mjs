@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const browserFiles=['src/launchpad-create-tx.mjs','src/launchpad-flow.mjs','src/launch-client.mjs','src/launchpad-plan.mjs','src/launchpad-model.mjs','src/launchpad-metadata.mjs','src/launchpad.jsx','worker/launchpad-upload.mjs'];
+const browserFiles=['src/launchpad-create-tx.mjs','src/launchpad-flow.mjs','src/launch-client.mjs','src/launchpad-plan.mjs','src/launchpad-model.mjs','src/launchpad-metadata.mjs','src/launchpad.jsx','worker/launchpad-upload.mjs','src/nush-economics.mjs','src/setup-table.mjs','src/setup.jsx','src/nush-brand.jsx','src/launch-registry.mjs','src/launch-analytics.mjs'];
 const read=f=>fs.readFileSync(new URL(`../${f}`,import.meta.url),'utf8');
 
 test('browser-bundled launchpad modules use no Node-only APIs',()=>{
@@ -15,9 +15,8 @@ test('browser-bundled launchpad modules use no Node-only APIs',()=>{
  }
 });
 
-test('the launchpad page loads the Buffer polyfill before anything else (the Pump SDK and web3.js need it)',()=>{
- const first=read('src/launchpad.jsx').split('\n')[0];
- assert.equal(first,"import './polyfills.mjs';");
+test('the launchpad and setup pages load the Buffer polyfill before anything else (the Pump SDK and web3.js need it)',()=>{
+ for(const f of ['src/launchpad.jsx','src/setup.jsx'])assert.equal(read(f).split('\n')[0],"import './polyfills.mjs';",f);
 });
 
 test('no storage credential name appears in code the browser receives',()=>{

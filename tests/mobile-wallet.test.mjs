@@ -12,14 +12,14 @@ test('mobile handoffs use the documented wallet browse URLs and a same-origin st
  }
 });
 test('handoffs reject unsafe schemes, credentials and unknown wallets',()=>{
- for(const url of ['javascript:alert(1)','http://senro.test','https://user:password@senro.test/'])assert.throws(()=>mobileWalletTarget(url));
- assert.throws(()=>walletBrowseLink('unknown','https://senro.test/'));
- assert.equal(mobileWalletTarget('https://senro.test//foreign.test/path').origin,'https://senro.test');
+ for(const url of ['javascript:alert(1)','http://nush.test','https://user:password@nush.test/'])assert.throws(()=>mobileWalletTarget(url));
+ assert.throws(()=>walletBrowseLink('unknown','https://nush.test/'));
+ assert.equal(mobileWalletTarget('https://nush.test//foreign.test/path').origin,'https://nush.test');
 });
 test('wallet handoff opens only the connection panel and consumes the one-time UI hint',()=>{
- assert.deepEqual(consumeWalletHandoff('https://senro.test/?connectWallet=1#studio'),{open:true,cleanPath:'/#studio'});
- assert.equal(consumeWalletHandoff('https://senro.test/#studio').open,false);
- assert.equal(consumeWalletHandoff('https://senro.test/?connectWallet=true#studio').open,false);
+ assert.deepEqual(consumeWalletHandoff('https://nush.test/?connectWallet=1#studio'),{open:true,cleanPath:'/#studio'});
+ assert.equal(consumeWalletHandoff('https://nush.test/#studio').open,false);
+ assert.equal(consumeWalletHandoff('https://nush.test/?connectWallet=true#studio').open,false);
 });
 test('phone and iPad desktop-mode detection does not imply an installed provider',()=>{
  assert.equal(isMobileBrowser({userAgent:'Mozilla iPhone',platform:'iPhone'}),true);
@@ -31,9 +31,9 @@ test('phone and iPad desktop-mode detection does not imply an installed provider
 
 test('launchpad handoff returns to the launchpad page without the studio hash',()=>{
  for(const wallet of MOBILE_WALLETS){
-  const link=new URL(walletBrowseLink(wallet.id,'https://senro.fun/launchpad.html?draft=1#x',{hash:''}));
+  const link=new URL(walletBrowseLink(wallet.id,'https://nush.fun/launchpad.html?draft=1#x',{hash:''}));
   const encoded=link.pathname.slice(new URL(wallet.browse).pathname.length);
-  assert.equal(decodeURIComponent(encoded),'https://senro.fun/launchpad.html?connectWallet=1');
+  assert.equal(decodeURIComponent(encoded),'https://nush.fun/launchpad.html?connectWallet=1');
  }
- assert.deepEqual(consumeWalletHandoff('https://senro.fun/launchpad.html?connectWallet=1'),{open:true,cleanPath:'/launchpad.html'});
+ assert.deepEqual(consumeWalletHandoff('https://nush.fun/launchpad.html?connectWallet=1'),{open:true,cleanPath:'/launchpad.html'});
 });

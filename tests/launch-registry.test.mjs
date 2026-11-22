@@ -110,3 +110,13 @@ test('studio link carries only the mint and is safely encoded',()=>{
  assert.equal(studioLink('So11111111111111111111111111111111111111112'),'/?mint=So11111111111111111111111111111111111111112#studio');
  assert.equal(studioLink('a&b=c'),'/?mint=a%26b%3Dc#studio');
 });
+
+test('launches saved under the pre-rename key are still loaded, and saved forward under the new key',async()=>{
+ const {LEGACY_REGISTRY_KEY}=await import('../src/launch-registry.mjs');
+ const memory=new Map(),storage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,v)};
+ const r=createRegistry();r.ingest(rec({slot:9}));
+ memory.set(LEGACY_REGISTRY_KEY,JSON.stringify({version:1,records:r.list()}));
+ const loaded=loadRegistry(storage);assert.equal(loaded.size(),1);
+ saveRegistry(loaded,storage);assert.ok(memory.get(REGISTRY_KEY));
+ assert.equal(REGISTRY_KEY,'nush-launches-v1');
+});

@@ -12,12 +12,13 @@
 import {Keypair} from '@solana/web3.js';
 import {validateLaunch} from './launchpad-model.mjs';
 import {prepareLaunchPlan} from './launchpad-plan.mjs';
+import {loadLookupTable} from './nush-economics.mjs';
 import {buildLaunchTransaction,simulateLaunch,signLaunchWithWallet,submitLaunch,verifyLaunchedMint} from './launchpad-create-tx.mjs';
 
 export const DISABLED_REASON='Live launches are not enabled in this deployment. Everything up to simulation runs; nothing is signed or sent.';
 const sameMetadata=(form,doc)=>doc&&doc.name===form.name&&doc.symbol===form.symbol;
 
-export function createLaunchFlow({enabled=false,connection,wallet,account,upload,newMint=()=>Keypair.generate(),now=Date.now,confirm={},persist=()=>{},onLaunched=()=>{}}){
+export function createLaunchFlow({enabled=false,economics=null,requireEconomics=false,connection,wallet,account,upload,newMint=()=>Keypair.generate(),now=Date.now,confirm={},persist=()=>{},onLaunched=()=>{}}){
  let state={stage:'idle'},generation=0,session=null;
  const listeners=new Set();
  const set=(patch,gen=generation)=>{if(gen!==generation)return false;state={...patch};listeners.forEach(fn=>fn(state));return true;};
@@ -28,6 +29,8 @@ export function createLaunchFlow({enabled=false,connection,wallet,account,upload
   const result=validateLaunch(form);
   if(!result.valid)return set({stage:'invalid',errors:result.errors},gen),state;
   if(!account?.address)return fail(gen,'Connect a wallet first.'),state;
+  if(requireEconomics&&!economics)return fail(gen,'Launch fees are not set up on this site yet. Nothing was launched.'),state;
+  if(economics&&account.address===economics.treasury)return fail(gen,'The Nush treasury wallet cannot launch tokens. Connect a different wallet.'),state;
   try{
    set({stage:'uploading'},gen);
    const uploaded=await upload({form,wallet,account});
@@ -36,14 +39,15 @@ export function createLaunchFlow({enabled=false,connection,wallet,account,upload
    set({stage:'building'},gen);
    const mintKeypair=newMint();
    const {blockhash,lastValidBlockHeight}=await connection.getLatestBlockhash('confirmed');
-   const plan=prepareLaunchPlan({form,creator:account.address,mint:mintKeypair.publicKey.toBase58(),metadataUri:uploaded.metadataUri});
-   const {transaction,binding}=await buildLaunchTransaction({plan,mintKeypair,blockhash,lastValidBlockHeight});
+   const lookupTable=economics?await loadLookupTable({connection,economics}):undefined;
+   const plan=prepareLaunchPlan({form,creator:account.address,mint:mintKeypair.publicKey.toBase58(),metadataUri:uploaded.metadataUri,economics});
+   const {transaction,binding}=await buildLaunchTransaction({plan,mintKeypair,blockhash,lastValidBlockHeight,lookupTable});
    if(gen!==generation)return state;
    set({stage:'simulating'},gen);
    const simulation=await simulateLaunch({connection,transaction,binding,plan,now});
    if(gen!==generation)return state;
    session={plan,transaction,binding,mintKeypair};
-   const review={name:plan.name??form.name,symbol:plan.symbol??form.symbol,creator:binding.creator,mint:binding.mint,metadataUri:uploaded.metadataUri,imageUri:uploaded.imageUri,messageHash:binding.messageHash,lastValidBlockHeight,feeLamports:simulation.feeLamports,creatorDebitLamports:simulation.creatorDebitLamports,unitsConsumed:simulation.unitsConsumed,simulatedAt:simulation.simulatedAt};
+   const review={name:plan.name??form.name,symbol:plan.symbol??form.symbol,creator:binding.creator,mint:binding.mint,metadataUri:uploaded.metadataUri,imageUri:uploaded.imageUri,messageHash:binding.messageHash,lastValidBlockHeight,feeLamports:simulation.feeLamports,creatorDebitLamports:simulation.creatorDebitLamports,unitsConsumed:simulation.unitsConsumed,simulatedAt:simulation.simulatedAt,fees:economics?{launchFeeLamports:economics.launchFeeLamports,treasuryShareBps:economics.treasuryShareBps,treasury:economics.treasury}:null};
    if(simulation.err)return set({stage:'simulation-failed',review,error:'Simulation failed. Nothing was signed.',err:simulation.err,logs:simulation.logs.slice(-12)},gen),state;
    set({stage:'ready',review,enabled,disabledReason:enabled?null:DISABLED_REASON},gen);
   }catch(e){fail(gen,e);}

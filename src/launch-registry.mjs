@@ -10,7 +10,7 @@
 import {PublicKey} from '@solana/web3.js';
 import {loadPumpSdk} from './pump-sdk.mjs';
 
-export const REGISTRY_KEY='senro-launches-v1';
+export const REGISTRY_KEY='nush-launches-v1';
 export const MAX_RECORDS=200;
 export const PAGE_MAX=50;
 const BASE58=/^[1-9A-HJ-NP-Za-km-z]+$/;
@@ -69,8 +69,10 @@ export function createRegistry(initial=[]){
 }
 
 /** Loads the registry from a Storage-like object. Corrupt or foreign data yields an empty or partial registry. */
+// Launches saved before the rename to Nush live under the old key; read it when the new one is empty.
+export const LEGACY_REGISTRY_KEY='senro-launches-v1';
 export function loadRegistry(storage=globalThis.localStorage,key=REGISTRY_KEY){
- try{const data=JSON.parse(storage.getItem(key));return createRegistry(Array.isArray(data?.records)?data.records:[]);}catch{return createRegistry();}
+ try{const data=JSON.parse(storage.getItem(key)??(key===REGISTRY_KEY?storage.getItem(LEGACY_REGISTRY_KEY):null));return createRegistry(Array.isArray(data?.records)?data.records:[]);}catch{return createRegistry();}
 }
 export function saveRegistry(registry,storage=globalThis.localStorage,key=REGISTRY_KEY){
  try{storage.setItem(key,JSON.stringify({version:1,records:registry.list()}));return true;}catch{return false;}

@@ -23,7 +23,7 @@ let sdkPromise;
 async function sdks(){return sdkPromise??=Promise.all([loadPumpSdk(),import('@pump-fun/pump-sdk/swap')]);}
 export async function requireMainnet(connection){if(await connection.getGenesisHash()!==MAINNET_GENESIS)throw Error('This connection is not Solana mainnet. Choose a mainnet RPC.');}
 export function readMint(info){if(!info||info.executable||(!info.owner.equals(TOKEN_PROGRAM)&&!info.owner.equals(TOKEN_2022))||info.data.length<82||info.data[45]!==1||(info.owner.equals(TOKEN_PROGRAM)&&info.data.length!==82)||(info.owner.equals(TOKEN_2022)&&info.data.length!==82&&(info.data.length<166||info.data[165]!==1||info.data.subarray(82,165).some(v=>v!==0))))throw Error('This address is not an initialized SPL token mint.');return {decimals:info.data[44],tokenProgram:info.owner};}
-export function requireSolQuote(quoteMint){if(quoteMint&&!quoteMint.equals(PublicKey.default)&&!quoteMint.equals(SOL_MINT))throw Error('This contract address is paired with a non-SOL asset. SENRO currently simulates SOL-paired tokens only.');}
+export function requireSolQuote(quoteMint){if(quoteMint&&!quoteMint.equals(PublicKey.default)&&!quoteMint.equals(SOL_MINT))throw Error('This contract address is paired with a non-SOL asset. Nush currently simulates SOL-paired tokens only.');}
 export async function inspectMarket(connection,address){
  const mint=publicKey(address);await requireMainnet(connection);const [pump,amm]=await sdks();
  const curveAddress=pump.bondingCurvePda(mint),poolAddress=amm.canonicalPumpPoolPda(mint,SOL_MINT);

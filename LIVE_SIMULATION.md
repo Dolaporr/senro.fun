@@ -1,4 +1,4 @@
-# SENRO mainnet simulation
+# Nush mainnet simulation
 
 The existing interface now provides a separate mainnet SOL-buy simulation flow.
 
@@ -8,10 +8,10 @@ The existing interface now provides a separate mainnet SOL-buy simulation flow.
 - Official @pump-fun/pump-sdk 4.3.1 builders: curve buy_exact_quote_in_v3 and PumpSwap buy_exact_quote_in_v2.
 - Exact input budget, positive minimum token output and unsigned simulateTransaction; no send method.
 - Quote, observed ATA balance delta, estimated network fee, compute usage, program logs and exportable report.
-- Request fingerprint binds wallet, mint, venue, input, slippage, revision and rules; a separate hash identifies the built message. Neither is represented as an on-chain SENRO commitment.
+- Request fingerprint binds wallet, mint, venue, input, slippage, revision and rules; a separate hash identifies the built message. Neither is represented as an on-chain Nush commitment.
 - Edits invalidate visible results. Results expire after 30 seconds. Reports are diagnostic snapshots and are never execution authorization.
 - Trade size and account cap can be assessed locally. Rolling volume is unverified without authoritative history. Sell cooldown is not applicable to the buy-only flow.
-- The mainnet transaction calls the venue directly; SENRO guards are not deployed or enforced by it.
+- The mainnet transaction calls the venue directly; Nush guards are not deployed or enforced by it.
 - Non-SOL quotes, noncanonical pools, legacy cashback curves and signing/execution are unsupported in this release.
 
 The default browser connection uses PublicNode directly, with paced RPC requests. On connection failures or transport rate limits it can fall back to /api/solana, a same-origin Worker relay with two fixed public mainnet upstreams (PublicNode, then Solana’s public endpoint), an RPC method allowlist, request-size bounds, and validation that simulated transactions have one empty signature. It rejects broadcasting, signing, batching, and foreign-origin calls. Custom HTTPS endpoints are used directly from the browser, remain in tab memory, and are excluded from reports. The public upstream may rate limit; the UI reports failures and permits a custom RPC.
@@ -25,7 +25,7 @@ The default browser connection uses PublicNode directly, with paced RPC requests
 Opt-in live smoke test (only public data and unsigned simulation):
 
 ```
-SENRO_SIMULATION_ADDRESS=<funded-public-wallet> node scripts/smoke-mainnet.mjs
+Nush_SIMULATION_ADDRESS=<funded-public-wallet> node scripts/smoke-mainnet.mjs
 ```
 
 Observed 5 November 2026 using public mainnet state:

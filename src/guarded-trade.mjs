@@ -97,7 +97,7 @@ export async function signAndSubmitGuarded({connection,deployment,ticket,fingerp
  const output=await feature.signTransaction({account,chain:'solana:mainnet',transaction:original.serialize()});
  if(output?.length!==1)throw Error('Wallet returned an unexpected transaction count.');
  const signed=VersionedTransaction.deserialize(output[0].signedTransaction);
- if(signed.signatures.length!==1||signed.serialize().length>1232||await digest(signed.message.serialize())!==ticket.messageHash)throw Error('Wallet changed the reviewed transaction. Nothing was submitted by SENRO.');
+ if(signed.signatures.length!==1||signed.serialize().length>1232||await digest(signed.message.serialize())!==ticket.messageHash)throw Error('Wallet changed the reviewed transaction. Nothing was submitted by Nush.');
  const publicKey=await crypto.subtle.importKey('raw',key(ticket.wallet).toBytes(),{name:'Ed25519'},false,['verify']);
  if(!await crypto.subtle.verify('Ed25519',publicKey,signed.signatures[0],signed.message.serialize()))throw Error('Wallet returned an invalid signature.');
  await checkReview({connection,deployment,ticket,fingerprint,isCurrent,now});

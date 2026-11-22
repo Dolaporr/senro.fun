@@ -4,6 +4,10 @@
 // rebuilt from the validated launch plan and compared byte-for-byte with what is about to be signed
 // or sent, so a swapped account, program, instruction or data blob is rejected.
 //
+// With Nush economics (plan.economics) the launch also creates the coin's Pump fee-sharing config, splits
+// creator fees 75/25 with the Nush treasury and pays the 0.01 SOL launch fee, all in this one transaction,
+// compiled through the Nush address lookup table to fit the packet limit.
+//
 // Scope of this version: launch WITHOUT an initial buy (SOL-quoted curve, no mayhem mode, no holder
 // reward, no custom creator fee). An initial buy stays disabled until its quote, slippage and
 // fee/rent maths are verified against a live Global account.
@@ -12,6 +16,7 @@ import {sha256,hex} from './policy-client.mjs';
 import {base58} from './guarded-trade.mjs';
 import {assertSimulatedLaunch} from './launchpad-plan.mjs';
 import {loadPumpSdk} from './pump-sdk.mjs';
+import {economicsInstructions} from './nush-economics.mjs';
 
 // Browser-safe helpers: this module is bundled for the browser, where Node's Buffer does not exist.
 const sameBytes=(a,b)=>a.length===b.length&&a.every((v,i)=>v===b[i]);
@@ -69,9 +74,21 @@ export async function expectedLaunchInstructions(plan,options={}){
   mint,name:plan.metadata.name,symbol:plan.metadata.symbol,uri:plan.metadataUri,
   creator,user:creator,mayhemMode:false
  }));
+ if(plan.economics)instructions.push(...await economicsInstructions({creator,mint,economics:plan.economics}));
  return instructions;
 }
 
+// Lookup tables a launch may be compiled with, by address. Only the table named in the plan is ever used.
+const lookupTables=new Map();
+export function useLookupTable(table){if(!table?.key||!table?.state?.addresses)throw Error('A loaded lookup table is required.');lookupTables.set(table.key.toBase58(),table);return table;}
+function tablesFor(plan,message){
+ const lookups=message.addressTableLookups;
+ if(!plan.economics){if(lookups.length)throw Error('Launch transaction must not use address lookup tables.');return [];}
+ if(lookups.length!==1||lookups[0].accountKey.toBase58()!==plan.economics.lookupTable)throw Error('Launch must use only the Nush lookup table.');
+ const table=lookupTables.get(plan.economics.lookupTable);
+ if(!table)throw Error('The Nush lookup table is not loaded.');
+ return [table];
+}
 const sameKeys=(a,b)=>a.length===b.length&&a.every((k,i)=>k.pubkey.equals(b[i].pubkey)&&k.isSigner===b[i].isSigner&&k.isWritable===b[i].isWritable);
 
 /**
@@ -84,16 +101,20 @@ export async function assertLaunchTransaction(tx,plan,options={}){
  const creator=new PublicKey(plan.creator),mint=new PublicKey(plan.mint);
  if(tx.version!==0)throw Error('Launch transaction must be a v0 message.');
  const message=tx.message;
- if(message.addressTableLookups.length)throw Error('Launch transaction must not use address lookup tables.');
+ const tables=tablesFor(plan,message);
  if(!message.staticAccountKeys[0].equals(creator))throw Error('Fee payer must be the creator wallet.');
  if(message.header.numRequiredSignatures!==2)throw Error('Launch needs exactly two signers: the creator and the new mint.');
  const signers=message.staticAccountKeys.slice(0,2);
  if(!signers[0].equals(creator)||!signers[1].equals(mint))throw Error('Launch signers do not match the plan.');
  if(tx.serialize().length>PACKET_LIMIT)throw Error('Launch transaction exceeds the packet limit.');
- const actual=TransactionMessage.decompile(message).instructions;
- if(actual.length!==expected.length)throw Error('Launch transaction has unexpected instructions.');
+ const actual=TransactionMessage.decompile(message,{addressLookupTableAccounts:tables}).instructions;
+ // Compile the SDK's own instructions the same way and decompile them too: an account used by several
+ // instructions gets merged signer/writable flags, so like is compared with like, account by account.
+ const reference=new TransactionMessage({payerKey:creator,recentBlockhash:message.recentBlockhash,instructions:expected}).compileToV0Message(tables);
+ const wanted=TransactionMessage.decompile(reference,{addressLookupTableAccounts:tables}).instructions;
+ if(actual.length!==wanted.length)throw Error('Launch transaction has unexpected instructions.');
  actual.forEach((ix,i)=>{
-  const want=expected[i];
+  const want=wanted[i];
   if(!ix.programId.equals(want.programId)||!sameBytes(ix.data,want.data)||!sameKeys(ix.keys,want.keys))throw Error(`Launch instruction ${i} differs from the verified SDK instruction.`);
  });
  return true;
@@ -104,14 +125,19 @@ export async function assertLaunchTransaction(tx,plan,options={}){
  * needs the mint as a signer); the creator signature is left empty for the wallet.
  * The mint keypair must live only in memory and be discarded after the launch settles or expires.
  */
-export async function buildLaunchTransaction({plan,mintKeypair,blockhash,lastValidBlockHeight,...compute}={}){
+export async function buildLaunchTransaction({plan,mintKeypair,blockhash,lastValidBlockHeight,lookupTable,...compute}={}){
  assertPlan(plan);
  const options=computeOptions(compute);
  if(!mintKeypair?.publicKey||mintKeypair.publicKey.toBase58()!==plan.mint)throw Error('Mint signer does not match the launch plan.');
  let bh;try{bh=new PublicKey(blockhash)}catch{throw Error('A valid recent blockhash is required.');}
  if(!Number.isSafeInteger(lastValidBlockHeight)||lastValidBlockHeight<=0)throw Error('A valid last-valid block height is required.');
  const instructions=await expectedLaunchInstructions(plan,options);
- const message=new TransactionMessage({payerKey:new PublicKey(plan.creator),recentBlockhash:bh.toBase58(),instructions}).compileToV0Message();
+ let tables=[];
+ if(plan.economics){
+  if(lookupTable?.key?.toBase58()!==plan.economics.lookupTable)throw Error('The Nush lookup table is required to build this launch.');
+  tables=[useLookupTable(lookupTable)];
+ }
+ const message=new TransactionMessage({payerKey:new PublicKey(plan.creator),recentBlockhash:bh.toBase58(),instructions}).compileToV0Message(tables);
  const transaction=new VersionedTransaction(message);
  transaction.sign([mintKeypair]);
  await assertLaunchTransaction(transaction,plan,options);
@@ -148,17 +174,19 @@ export async function simulateLaunch({connection,transaction,binding,plan,now=Da
  const valid=await connection.isBlockhashValid(binding.blockhash,{commitment:'confirmed'});
  if(!valid?.value)throw Error('The blockhash expired. Prepare the launch again.');
  const creator=new PublicKey(binding.creator);
- const writable=(await expectedLaunchInstructions(plan,binding.compute)).flatMap(ix=>ix.keys.filter(k=>k.isWritable&&!k.isSigner).map(k=>k.pubkey.toBase58()));
- const addresses=[...new Set([binding.creator,...writable])];
+ // Only the balances the review shows: the creator's, and the treasury's when fees apply (relay allows 8).
+ const addresses=plan.economics?[binding.creator,plan.economics.treasury]:[binding.creator];
  const [before,feeResult]=await Promise.all([connection.getBalance(creator,'confirmed'),connection.getFeeForMessage(transaction.message,'confirmed')]);
  const response=await connection.simulateTransaction(transaction,{sigVerify:false,replaceRecentBlockhash:false,commitment:'confirmed',accounts:{encoding:'base64',addresses}});
  const accounts=(response.value.accounts??[]).map((a,i)=>a?{address:addresses[i],lamports:a.lamports,owner:a.owner,dataLength:base64Length(a.data[0])}:{address:addresses[i],lamports:null});
  const after=accounts.find(a=>a.address===binding.creator)?.lamports;
+ const treasuryAfter=plan.economics?accounts.find(a=>a.address===plan.economics.treasury)?.lamports:null;
  return {
   err:response.value.err??null,logs:response.value.logs??[],unitsConsumed:response.value.unitsConsumed??null,
   slot:response.context.slot,simulatedAt:now(),messageHash:binding.messageHash,
   feeLamports:feeResult?.value??null,
   creatorDebitLamports:typeof after==='number'?before-after:null,
+  treasuryAfterLamports:typeof treasuryAfter==='number'?treasuryAfter:null,
   accounts
  };
 }
@@ -227,18 +255,20 @@ export async function waitForConfirmation({connection,signature,lastValidBlockHe
  * with the wallet as creator and is not complete. On-chain token metadata is not checked here.
  */
 export async function verifyLaunchedMint({connection,plan,commitment='confirmed'}){
- const {PUMP_SDK,PUMP_PROGRAM_ID,bondingCurvePda}=await pumpSdk();
+ const {PUMP_SDK,PUMP_PROGRAM_ID,bondingCurvePda,feeSharingConfigPda}=await pumpSdk();
  const mint=new PublicKey(plan.mint),curveAddress=bondingCurvePda(mint);
  const [mintAccount,curveAccount]=await connection.getMultipleAccountsInfo([mint,curveAddress],commitment);
  if(!mintAccount)throw Error('Mint account was not found.');
  if(!TOKEN_PROGRAMS.some(p=>mintAccount.owner.equals(p)))throw Error('Mint is not owned by an SPL token program.');
- const createKeys=(await expectedLaunchInstructions(plan,{})).at(-1).keys;
+ const createKeys=(await expectedLaunchInstructions(plan,{})).find(ix=>ix.programId.equals(PUMP_PROGRAM_ID)).keys;
  if(!createKeys.some(k=>k.pubkey.equals(mintAccount.owner)))throw Error('Mint token program is not the one create_v2 uses.');
  if(!curveAccount||!curveAccount.owner.equals(PUMP_PROGRAM_ID))throw Error('Pump bonding curve was not found under the Pump program.');
  const curve=PUMP_SDK.decodeBondingCurve(curveAccount);
- if(!curve.creator.equals(new PublicKey(plan.creator)))throw Error('Bonding curve creator is not the launching wallet.');
+ // With Nush economics the curve's creator is the coin's fee-sharing config, which proves the split was set.
+ const wantCreator=plan.economics?feeSharingConfigPda(mint):new PublicKey(plan.creator);
+ if(!curve.creator.equals(wantCreator))throw Error(plan.economics?'The creator fee split was not set on this coin.':'Bonding curve creator is not the launching wallet.');
  if(curve.complete)throw Error('Bonding curve is already complete.');
- return {mint:mint.toBase58(),bondingCurve:curveAddress.toBase58(),creator:curve.creator.toBase58(),tokenProgram:mintAccount.owner.toBase58(),complete:false};
+ return {mint:mint.toBase58(),bondingCurve:curveAddress.toBase58(),creator:plan.creator,curveCreator:curve.creator.toBase58(),feeSplit:!!plan.economics,tokenProgram:mintAccount.owner.toBase58(),complete:false};
 }
 
 /**

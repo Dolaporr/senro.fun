@@ -1,0 +1,22 @@
+import React from 'react';
+
+// Nush duotone symbols: familiar silhouettes, generous spacing and quiet filled planes.
+// All symbols share a 24px grid, a 1.65px stroke and restrained violet accents.
+const drawings={
+ token:<><path className="nush-icon-soft" d="m12 2.8 7.8 4.6v9.2L12 21.2l-7.8-4.6V7.4L12 2.8Z"/><path d="m12 2.8 7.8 4.6v9.2L12 21.2l-7.8-4.6V7.4L12 2.8Z"/><circle cx="12" cy="12" r="3.4"/><path className="nush-icon-accent" d="M12 9.9v4.2M10.7 10.5l1.3-.6"/></>,
+ wallet:<><rect className="nush-icon-soft" x="3" y="6" width="17" height="14" rx="3"/><path d="M17 6V4.5a1.5 1.5 0 0 0-1.8-1.4L5 5.5a2.5 2.5 0 0 0-2 2.4V17a3 3 0 0 0 3 3h12a2 2 0 0 0 2-2v-2M6 6h12a2 2 0 0 1 2 2v2"/><path className="nush-icon-accent" d="M16 10h5v6h-5a3 3 0 0 1 0-6Z"/><circle cx="16.5" cy="13" r=".75" fill="currentColor" stroke="none"/></>,
+ connection:<><path className="nush-icon-soft" d="M8.5 7.5h7v9h-7z"/><path d="m10 8 2-2a4.2 4.2 0 0 1 6 6l-2 2M14 16l-2 2a4.2 4.2 0 0 1-6-6l2-2"/><path className="nush-icon-accent" d="m9 15 6-6"/></>,
+ cap:<><path className="nush-icon-soft" d="M4 18a8 8 0 0 1 16 0H4Z"/><path d="M4 18a8 8 0 0 1 16 0M3.5 5h17M7 5v2M17 5v2"/><path className="nush-icon-accent" d="m12 17 3.5-4M8 21h8"/><circle cx="12" cy="17" r="1.1" fill="currentColor" stroke="none"/></>,
+ volume:<><path className="nush-icon-soft" d="M5 13h3v7H5zM10.5 9h3v11h-3zM16 5h3v15h-3z"/><path d="M5.5 15v5M12 11v9M18.5 7v13M3 21h18"/><path className="nush-icon-accent" d="m4 9 5-4 4 1 6-3M16 3h3v3"/></>,
+ cooldown:<><circle className="nush-icon-soft" cx="12" cy="13" r="8"/><path d="M9 2h6M12 2v3M18.5 6.5l1.8-1.8"/><circle cx="12" cy="13" r="8"/><path className="nush-icon-accent" d="M12 8.5V13l3 2"/></>,
+ balance:<><ellipse className="nush-icon-soft" cx="9" cy="6" rx="6" ry="3"/><ellipse cx="9" cy="6" rx="6" ry="3"/><path d="M3 6v5c0 1.7 2.7 3 6 3M3 11v5c0 1.7 2.7 3 6 3M15 6v3"/><path className="nush-icon-soft" d="M11 14c0-1.7 2.2-3 5-3s5 1.3 5 3v4c0 1.7-2.2 3-5 3s-5-1.3-5-3v-4Z"/><ellipse className="nush-icon-accent" cx="16" cy="14" rx="5" ry="3"/><path d="M11 14v4c0 1.7 2.2 3 5 3s5-1.3 5-3v-4"/></>,
+ studio:<><rect className="nush-icon-soft" x="3" y="3" width="18" height="18" rx="4"/><path d="M5 7h14M5 17h14M9 4v6M15 14v6"/><circle className="nush-icon-accent" cx="9" cy="7" r="2.5" fill="var(--icon-knob,#242031)"/><circle className="nush-icon-accent" cx="15" cy="17" r="2.5" fill="var(--icon-knob,#242031)"/></>,
+ rules:<><rect className="nush-icon-soft" x="5" y="3" width="14" height="17" rx="2.5"/><rect x="5" y="3" width="14" height="17" rx="2.5"/><path d="M2 7v12a4 4 0 0 0 4 4h9"/><path className="nush-icon-accent" d="m8 8 1.2 1.2L11 7M13 8h3M8 13h8M8 16h5"/></>,
+ activity:<><path className="nush-icon-soft" d="M3 18V7h18v11H3Z"/><path d="M3 20h18M3 4h18"/><path className="nush-icon-accent" d="M3 12h4l2-5 4 10 2-5h6"/></>,
+ preview:<><path className="nush-icon-soft" d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"/><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"/><circle className="nush-icon-accent" cx="12" cy="12" r="3"/></>,
+ network:<><path d="m6 6 12 2M6 6l3 13M18 8l-9 11"/><circle className="nush-icon-soft" cx="6" cy="6" r="3"/><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle className="nush-icon-accent" cx="9" cy="19" r="2.5"/></>,
+ history:<><path className="nush-icon-soft" d="M4 10a8 8 0 1 1 2 8"/><path d="M4 10a8 8 0 1 1 2 8M4 4v6h6"/><path className="nush-icon-accent" d="M12 7v6h4"/></>,
+ address:<><rect className="nush-icon-soft" x="3" y="4" width="18" height="16" rx="3"/><rect x="3" y="4" width="18" height="16" rx="3"/><path className="nush-icon-accent" d="m9 9-3 3 3 3M15 9l3 3-3 3"/></>,
+};
+export function NushIcon({name,size=20,className='',...props}){return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`nush-icon ${className}`} {...props}>{drawings[name]??drawings.connection}</svg>}
+export function WalletBrand({wallet,size=32}){const [failed,setFailed]=React.useState(false);const icon=wallet?.icon;const safe=typeof icon==='string'&&/^data:image\/(png|jpeg|webp|svg\+xml);base64,/i.test(icon)&&icon.length<700000;return <span className="wallet-brand" style={{width:size,height:size}}>{safe&&!failed?<img src={icon} alt="" width={size} height={size} onError={()=>setFailed(true)}/>:<span aria-hidden="true">{wallet?.name?.slice(0,1)?.toUpperCase()||<NushIcon name="wallet" size={19}/>}</span>}</span>}

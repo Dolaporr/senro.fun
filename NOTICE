@@ -1,7 +1,7 @@
-SENRO
+Nush
 
-Includes source adapted from Pumphooks/pumphooks, originally under Apache License 2.0.
-Upstream: https://github.com/Pumphooks/pumphooks
+Includes source adapted from Nush/nush, originally under Apache License 2.0.
+Upstream: https://github.com/Nush/nush
 Pinned commit: b7fc9f008ebd474b29a770ec7c4d434df84eff2d
 
 protocol/vendor/pump-adapter contains the pinned adapter source snapshot.

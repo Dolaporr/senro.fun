@@ -5,7 +5,7 @@
 // a Pump create_v2 launch: v0, two signers, no lookup tables, optional ComputeBudget limit/price,
 // and exactly one Pump-program instruction carrying the create_v2 discriminator. Sends additionally
 // require both signatures to verify. It cannot be used to send an arbitrary transaction.
-import {VersionedTransaction} from '@solana/web3.js';
+import {PublicKey,VersionedTransaction} from '@solana/web3.js';
 
 export const PUMP_PROGRAM_ID='6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
 export const COMPUTE_BUDGET_ID='ComputeBudget111111111111111111111111111111';
@@ -41,28 +41,66 @@ export function clientKey(request,platformIp){
  const ip=platformIp||request.headers.get('x-nf-client-connection-ip')||'shared';
  return String(ip).slice(0,64);
 }
-const READ_METHODS=new Set(['getGenesisHash','getBalance','getFeeForMessage','isBlockhashValid','getLatestBlockhash','getBlockHeight','getMultipleAccounts','getSignatureStatuses']);
+const READ_METHODS=new Set(['getGenesisHash','getBalance','getFeeForMessage','isBlockhashValid','getLatestBlockhash','getBlockHeight','getMultipleAccounts','getSignatureStatuses','getSlot']);
 const MAX_BODY=4096;
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff'}});
 
-/** Throws unless `base64` is a Pump create_v2 launch transaction; returns the decoded transaction. */
-export function inspectLaunchWire(base64){
+export const PUMP_FEE_PROGRAM_ID='pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ';
+export const SYSTEM_PROGRAM_ID='11111111111111111111111111111111';
+export const CREATE_FEE_SHARING_DISCRIMINATOR=[195,78,86,76,111,52,251,213];
+export const UPDATE_FEE_SHARES_DISCRIMINATOR=[189,13,136,99,187,164,237,35];
+const startsWith=(data,prefix)=>prefix.every((v,i)=>data[i]===v);
+const u16=(d,o)=>d[o]|d[o+1]<<8,u32=(d,o)=>(d[o]|d[o+1]<<8|d[o+2]<<16)+d[o+3]*2**24;
+const u64=(d,o)=>Number(d.slice(o,o+8).reduceRight((n,b)=>n*256n+BigInt(b),0n));
+const keyAt=(d,o)=>new PublicKey(d.slice(o,o+32)).toBase58();
+
+/**
+ * Throws unless `base64` is a Nush launch. Without economics: compute budget + exactly one Pump create_v2,
+ * no lookup tables. With economics (the treasury and lookup table configured on the server): the same,
+ * followed by exactly the Pump fee-sharing config, a 75/25 split between the fee payer and the treasury,
+ * and a transfer of exactly the launch fee from the fee payer to the treasury, through the Nush table only.
+ */
+export function inspectLaunchWire(base64,economics=null){
  if(typeof base64!=='string'||base64.length>1700)throw Error('Invalid transaction size.');
  let bytes;try{bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0));}catch{throw Error('Invalid base64 transaction.');}
  if(bytes.length>1232||bytes.length<130)throw Error('Invalid transaction size.');
  let tx;try{tx=VersionedTransaction.deserialize(bytes);}catch{throw Error('Invalid transaction.');}
- const m=tx.message;
- if(tx.version!==0||m.addressTableLookups.length)throw Error('Only v0 transactions without lookup tables are allowed.');
+ const m=tx.message,keys=m.staticAccountKeys;
+ if(tx.version!==0)throw Error('Only v0 transactions are allowed.');
+ if(economics){
+  if(m.addressTableLookups.length!==1||m.addressTableLookups[0].accountKey.toBase58()!==economics.lookupTable)throw Error('A Nush launch uses only the Nush lookup table.');
+ }else if(m.addressTableLookups.length)throw Error('Only v0 transactions without lookup tables are allowed.');
  if(m.header.numRequiredSignatures!==2||tx.signatures.length!==2)throw Error('A launch has exactly two signers.');
- let pump=0;
- for(const ix of m.compiledInstructions){
-  const program=m.staticAccountKeys[ix.programIdIndex].toBase58();
-  if(program===COMPUTE_BUDGET_ID){if(![2,3].includes(ix.data[0]))throw Error('Only compute limit and price instructions are allowed.');continue;}
-  if(program!==PUMP_PROGRAM_ID)throw Error('Only the Pump program is allowed.');
-  if(CREATE_V2_DISCRIMINATOR.some((v,i)=>ix.data[i]!==v))throw Error('Only the Pump create_v2 instruction is allowed.');
-  pump++;
+ const program=ix=>{if(ix.programIdIndex>=keys.length)throw Error('Program ids must be listed directly.');return keys[ix.programIdIndex].toBase58();};
+ const ixs=m.compiledInstructions;let i=0;
+ while(i<ixs.length&&program(ixs[i])===COMPUTE_BUDGET_ID){if(![2,3].includes(ixs[i].data[0]))throw Error('Only compute limit and price instructions are allowed.');i++;}
+ if(i>2)throw Error('At most two compute budget instructions are allowed.');
+ const rest=ixs.slice(i);
+ const create=rest[0];
+ if(!create)throw Error('A launch has exactly one Pump create instruction.');
+ if(program(create)!==PUMP_PROGRAM_ID)throw Error('Only the Pump program is allowed.');
+ if(!startsWith(create.data,CREATE_V2_DISCRIMINATOR))throw Error('Only the Pump create_v2 instruction is allowed.');
+ if(!economics){
+  if(rest.length!==1){
+   const other=rest.slice(1).map(program);
+   if(other.some(p=>p!==PUMP_PROGRAM_ID&&p!==COMPUTE_BUDGET_ID))throw Error('Only the Pump program is allowed.');
+   if(other.includes(COMPUTE_BUDGET_ID))throw Error('Compute budget instructions must come first.');
+   throw Error('A launch has exactly one Pump create instruction.');
+  }
+  return tx;
  }
- if(pump!==1)throw Error('A launch has exactly one Pump create instruction.');
+ if(rest.length!==4)throw Error('A Nush launch is the create, the fee split and the launch fee, nothing else.');
+ const [config,update,transfer]=rest.slice(1);
+ if(program(config)!==PUMP_FEE_PROGRAM_ID||!startsWith(config.data,CREATE_FEE_SHARING_DISCRIMINATOR))throw Error('The Pump fee-sharing config must follow the create.');
+ if(program(update)!==PUMP_FEE_PROGRAM_ID||!startsWith(update.data,UPDATE_FEE_SHARES_DISCRIMINATOR))throw Error('The Pump fee split must follow the config.');
+ const d=update.data,creator=keys[0].toBase58();
+ if(d.length!==12+34*2||u32(d,8)!==2)throw Error('The fee split must have exactly two shareholders.');
+ const shares=[[keyAt(d,12),u16(d,44)],[keyAt(d,46),u16(d,78)]];
+ if(shares[0][0]!==creator||shares[0][1]!==10_000-economics.treasuryShareBps||shares[1][0]!==economics.treasury||shares[1][1]!==economics.treasuryShareBps)throw Error('The fee split must be the creator and the Nush treasury at the agreed shares.');
+ if(program(transfer)!==SYSTEM_PROGRAM_ID||transfer.data.length!==12||u32(transfer.data,0)!==2)throw Error('The launch fee must be a plain SOL transfer.');
+ const [from,to]=transfer.accountKeyIndexes;
+ if(transfer.accountKeyIndexes.length!==2||from!==0||to>=keys.length||keys[to].toBase58()!==economics.treasury)throw Error('The launch fee must go from the creator to the Nush treasury.');
+ if(u64(transfer.data,4)!==economics.launchFeeLamports)throw Error('The launch fee amount is wrong.');
  return tx;
 }
 
@@ -77,7 +115,7 @@ async function signaturesValid(tx){
 }
 
 /** Validates one JSON-RPC request; returns it, or throws a user-facing message. */
-export async function validateLaunchRpc(body){
+export async function validateLaunchRpc(body,{economics=null}={}){
  if(!body||Array.isArray(body)||body.jsonrpc!=='2.0')throw Error('Invalid JSON-RPC request.');
  const params=body.params??[];if(!Array.isArray(params))throw Error('Invalid RPC parameters.');
  if(READ_METHODS.has(body.method)){
@@ -89,12 +127,12 @@ export async function validateLaunchRpc(body){
   const o=params[1];
   if(o?.encoding!=='base64'||o.sigVerify!==false||o.replaceRecentBlockhash!==false)throw Error('Simulate the exact message: unsigned check, original blockhash.');
   if(o.accounts&&(!Array.isArray(o.accounts.addresses)||o.accounts.addresses.length>8))throw Error('Inspect at most eight simulated accounts.');
-  inspectLaunchWire(params[0]);return body;
+  inspectLaunchWire(params[0],economics);return body;
  }
  if(body.method==='sendTransaction'){
   const o=params[1];
   if(o?.encoding!=='base64'||o.skipPreflight===true||(o.maxRetries!==undefined&&o.maxRetries!==0))throw Error('Sends require preflight and no relay retries.');
-  const tx=inspectLaunchWire(params[0]);
+  const tx=inspectLaunchWire(params[0],economics);
   if(!await signaturesValid(tx))throw Error('Both launch signatures must be valid.');
   return body;
  }
@@ -108,12 +146,12 @@ async function readBounded(request){
  const bytes=new Uint8Array(size);let o=0;for(const c of chunks){bytes.set(c,o);o+=c.length;}return new TextDecoder().decode(bytes);
 }
 
-export async function handleLaunchRpc(request,fetcher=fetch,{limiters=null,upstreams=PUBLIC_UPSTREAMS,ip=null}={}){
+export async function handleLaunchRpc(request,fetcher=fetch,{limiters=null,upstreams=PUBLIC_UPSTREAMS,ip=null,economics=null}={}){
  if(request.method!=='POST')return json({error:'Use POST.'},405);
  const origin=request.headers.get('origin');if(origin&&origin!==new URL(request.url).origin)return json({error:'Cross-origin requests are not allowed.'},403);
  if(Number(request.headers.get('content-length'))>MAX_BODY*2)return json({error:'Request too large.'},413);
  let body;
- try{const text=await readBounded(request);body=await validateLaunchRpc(JSON.parse(text));}
+ try{const text=await readBounded(request);body=await validateLaunchRpc(JSON.parse(text),{economics});}
  catch(e){return json({jsonrpc:'2.0',id:null,error:{code:-32600,message:e.message}},e.message==='Request too large.'?413:400);}
  if(limiters&&!limiters[methodClass(body.method)](clientKey(request,ip)))return json({jsonrpc:'2.0',id:body.id??null,error:{code:-32005,message:body.method==='sendTransaction'?'Too many launches from this connection. Wait a few minutes.':'Too many requests. Wait a moment and try again.'}},429);
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),18000);

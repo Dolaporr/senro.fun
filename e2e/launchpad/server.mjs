@@ -10,12 +10,18 @@ import {handleUpload} from '../../worker/launchpad-upload.mjs';
 import {GENESIS_HASH} from '../../src/launchpad-create-tx.mjs';
 import {loadPumpSdk} from '../../src/pump-sdk.mjs';
 import {base58} from '../../src/guarded-trade.mjs';
+import {readEconomicsConfig,lookupTableAddresses} from '../../src/nush-economics.mjs';
+import {altData} from '../../tests/helpers/nush-fixture.mjs';
+import {E2E_TREASURY,E2E_LOOKUP_TABLE} from './fixture.mjs';
 
 const sdk=await loadPumpSdk();
+// The live build is made with these fee settings (see build.mjs); the relay enforces the same ones.
+export const economics=readEconomicsConfig({treasury:E2E_TREASURY,lookupTable:E2E_LOOKUP_TABLE});
+const tableAddresses=await lookupTableAddresses(E2E_TREASURY);
 export const SEED=Uint8Array.from({length:32},(_,i)=>i+1);
 export const WALLET=Keypair.fromSeed(SEED).publicKey.toBase58();
 const BH=new PublicKey(new Uint8Array(32).fill(7)).toBase58();
-export const world={curves:new Set(),sent:[],simErr:null,status:'confirmed',calls:[],uploads:0,uploadFail:false};
+export const world={feesOn:true,mintsByCurve:new Map(),curves:new Set(),sent:[],simErr:null,status:'confirmed',calls:[],uploads:0,uploadFail:false};
 const ok=v=>({context:{slot:42},value:v});
 
 async function curve(creator){const z=new BN(0);return Buffer.from(await sdk.PUMP_SDK.offlinePumpProgram.coder.accounts.encode('bondingCurve',{virtualTokenReserves:new BN('800000000000000'),virtualQuoteReserves:new BN('40230000000'),realTokenReserves:new BN('547239000000000'),realQuoteReserves:new BN('10230000000'),tokenTotalSupply:new BN('1000000000000000'),complete:false,creator:new PublicKey(creator),isMayhemMode:false,isCashbackCoin:false,quoteMint:PublicKey.default,creatorFeeBps:z,canEditCreatorFee:false,isHolderReward:false,creatorFee:z,protocolFees:z,depth:0,initialVirtualQuoteReserves:z,postCompleteBaseOut:z,postCompleteQuoteIn:z})).toString('base64');}
@@ -39,14 +45,15 @@ const upstream=async(url,init)=>{
    case 'getFeeForMessage':return ok(5000);
    case 'getBlockHeight':return 50;
    case 'simulateTransaction':{const a=params[1].accounts.addresses;if(world.simErr)return ok({err:world.simErr,logs:['Program 6EF8… invoke [1]','Program log: Instruction: CreateV2','Program log: custom program error: 0x1','Program 6EF8… failed'],unitsConsumed:1,accounts:null});return ok({err:null,logs:['ok'],unitsConsumed:150000,accounts:a.map((x,i)=>({lamports:i===0?1_976_540_000:1_000_000,owner:'11111111111111111111111111111111',data:['','base64'],executable:false,rentEpoch:0}))});}
-   case 'sendTransaction':{const tx=VersionedTransaction.deserialize(Buffer.from(params[0],'base64'));world.sent.push(tx);world.curves.add(sdk.bondingCurvePda(tx.message.staticAccountKeys[1]).toBase58());return base58(tx.signatures[0]);}
+   case 'sendTransaction':{const tx=VersionedTransaction.deserialize(Buffer.from(params[0],'base64'));world.sent.push(tx);world.mintsByCurve.set(sdk.bondingCurvePda(tx.message.staticAccountKeys[1]).toBase58(),tx.message.staticAccountKeys[1]);world.curves.add(sdk.bondingCurvePda(tx.message.staticAccountKeys[1]).toBase58());return base58(tx.signatures[0]);}
    case 'getSignatureStatuses':return ok([world.sent.length&&world.status?{slot:43,confirmations:null,err:null,confirmationStatus:world.status}:null]);
    case 'getMultipleAccounts':{
     const out=[];
     for(const key of params[0]){
      if(key===sdk.GLOBAL_PDA.toBase58())out.push({lamports:1,owner:sdk.PUMP_PROGRAM_ID.toBase58(),data:[await globalData(),'base64'],executable:false,rentEpoch:0});
      else if(key===sdk.creatorVaultPda(new PublicKey(WALLET)).toBase58())out.push({lamports:890_880+12_340_000,owner:'11111111111111111111111111111111',data:['','base64'],executable:false,rentEpoch:0});
-     else if(world.curves.has(key))out.push({lamports:1,owner:sdk.PUMP_PROGRAM_ID.toBase58(),data:[await curve(WALLET),'base64'],executable:false,rentEpoch:0});
+     else if(key===E2E_LOOKUP_TABLE)out.push({lamports:1,owner:'AddressLookupTab1e1111111111111111111111111',data:[altData(tableAddresses).toString('base64'),'base64'],executable:false,rentEpoch:0});
+     else if(world.curves.has(key))out.push({lamports:1,owner:sdk.PUMP_PROGRAM_ID.toBase58(),data:[await curve(world.feesOn?sdk.feeSharingConfigPda(world.mintsByCurve.get(key)).toBase58():WALLET),'base64'],executable:false,rentEpoch:0});
      else out.push({lamports:1,owner:'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',data:['','base64'],executable:false,rentEpoch:0});
     }
     return ok(out);
@@ -69,22 +76,22 @@ export function serve(root,port){
    const url=new URL(req.url,`http://localhost:${port}`);
    if(url.pathname.startsWith('/__')){
     const [,k]=url.pathname.split('/__');
-    if(k==='reset'){Object.assign(world,{curves:new Set(),sent:[],simErr:null,status:'confirmed',calls:[],uploads:0,uploadFail:false});}
+    if(k==='reset'){Object.assign(world,{mintsByCurve:new Map(),curves:new Set(),sent:[],simErr:null,status:'confirmed',calls:[],uploads:0,uploadFail:false});}
     if(k==='simfail')world.simErr={InstructionError:[0,{Custom:1}]};
     if(k==='uploadfail')world.uploadFail=true;
     if(k==='pending')world.status=null;
-    res.setHeader('content-type','application/json');return res.end(JSON.stringify({sent:world.sent.length,calls:world.calls,uploads:world.uploads}));
+    res.setHeader('content-type','application/json');return res.end(JSON.stringify({lookups:world.sent.map(t=>t.message.addressTableLookups.length),sent:world.sent.length,calls:world.calls,uploads:world.uploads}));
    }
    if(url.pathname==='/api/launch-rpc'||url.pathname==='/api/launchpad/upload'){
     const body=req.method==='POST'?Buffer.concat(await(async()=>{const c=[];for await(const x of req)c.push(x);return c;})()):undefined;
     const request=new Request(url,{method:req.method,headers:{...req.headers,origin:`http://localhost:${port}`},body});
-    const response=url.pathname==='/api/launch-rpc'?await handleLaunchRpc(request,upstream):await handleUpload(request,{provider,fetcher:gateway,seen:new Map(),retries:{attempts:1,delayMs:0,wait:async()=>{}}});
+    const response=url.pathname==='/api/launch-rpc'?await handleLaunchRpc(request,upstream,{economics:world.feesOn?economics:null}):await handleUpload(request,{provider,fetcher:gateway,seen:new Map(),retries:{attempts:1,delayMs:0,wait:async()=>{}}});
     res.writeHead(response.status,Object.fromEntries(response.headers));return res.end(Buffer.from(await response.arrayBuffer()));
    }
    let file=path.join(root,url.pathname==='/'?'index.html':url.pathname);
    if(!file.startsWith(root)||!fs.existsSync(file)||fs.statSync(file).isDirectory())file=path.join(root,'index.html');
    let data=fs.readFileSync(file);
-   if(file.endsWith('launchpad.html')&&!url.searchParams.has('nowallet'))data=Buffer.from(String(data).replace('<head>',`<head><script>${walletScript}</script>`));
+   if((file.endsWith('launchpad.html')||file.endsWith('setup.html'))&&!url.searchParams.has('nowallet'))data=Buffer.from(String(data).replace('<head>',`<head><script>${walletScript}</script>`));
    res.writeHead(200,{'content-type':types[path.extname(file)]??'application/octet-stream'});res.end(data);
   });
   server.listen(port,()=>resolve(server));
