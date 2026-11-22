@@ -25,7 +25,7 @@ export function sniffImage(bytes){
 }
 
 /** Exact text the wallet signs. Binds the upload to one wallet, one image and one moment. */
-export const uploadAuthMessage=({wallet,imageSha256,issuedAt})=>`Pumphooks metadata upload\nwallet: ${wallet}\nimage-sha256: ${imageSha256}\nissued: ${issuedAt}`;
+export const uploadAuthMessage=({wallet,imageSha256,issuedAt})=>`Nush metadata upload\nwallet: ${wallet}\nimage-sha256: ${imageSha256}\nissued: ${issuedAt}`;
 
 const B58='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 function base58Decode(text){

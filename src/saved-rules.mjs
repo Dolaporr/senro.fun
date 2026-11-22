@@ -1,5 +1,5 @@
 import {quantities,DEFAULT_CONFIG} from './model.mjs';
-const STORAGE_KEY='senro-rule-library-v1';
+const STORAGE_KEY='nush-rule-library-v1';
 export function validateSnapshot(value){
  if(!value||typeof value.id!=='string'||!value.id||typeof value.name!=='string'||!value.name.trim()||value.name.length>48||!Number.isSafeInteger(value.revision)||value.revision<1||!Number.isFinite(value.createdAt))throw Error('Invalid saved rule set.');
  const config={};for(const k of Object.keys(DEFAULT_CONFIG)){if(typeof value.config?.[k]!==typeof DEFAULT_CONFIG[k])throw Error('Invalid saved rule values.');config[k]=value.config[k]}

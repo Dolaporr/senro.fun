@@ -13,7 +13,7 @@ import {MAX_IMAGE_BYTES} from '../src/launchpad-model.mjs';
 const PNG=Uint8Array.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,...Array(64).fill(1)]);
 const JPEG=Uint8Array.from([0xff,0xd8,0xff,0xe0,...Array(64).fill(2)]);
 const WEBP=Uint8Array.from([0x52,0x49,0x46,0x46,0,0,0,0,0x57,0x45,0x42,0x50,...Array(32).fill(3)]);
-const URL_='https://senro.test/api/launchpad/upload';
+const URL_='https://nush.test/api/launchpad/upload';
 const NOW=1_800_000_000_000;
 const retries={attempts:2,delayMs:0,wait:async()=>{}};
 const sha=async b=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',b)),x=>x.toString(16).padStart(2,'0')).join('');

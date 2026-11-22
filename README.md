@@ -1,8 +1,8 @@
-# SENRO
+# Nush
 
 A rule studio for Solana: set limits and inspect an unsigned Pump / PumpSwap buy simulation before trading.
 
-**Experimental, simulation-only.** The published configuration does not sign or broadcast transactions. The guard program is local, undeployed and unaudited. A gated browser integration is included but disabled pending deployment and end-to-end validation. A passing venue simulation is not proof that SENRO rules were enforced on-chain.
+**Experimental, simulation-only.** The published configuration does not sign or broadcast transactions. The guard program is local, undeployed and unaudited. A gated browser integration is included but disabled pending deployment and end-to-end validation. A passing venue simulation is not proof that Nush rules were enforced on-chain.
 
 ## Run the app
 
@@ -37,7 +37,7 @@ python3 scripts/fetch-guard-fixtures.py
 npm run test:guard
 ```
 
-Captured Pump executables and generated guard binaries are excluded. The fetch script validates pinned executable hashes and fails if upstream deployments changed; it never silently updates pins. Set `SENRO_RPC_URL` for another HTTPS Solana mainnet RPC if the public endpoint rate-limits requests. Keep authenticated endpoints private.
+Captured Pump executables and generated guard binaries are excluded. The fetch script validates pinned executable hashes and fails if upstream deployments changed; it never silently updates pins. Set `Nush_RPC_URL` for another HTTPS Solana mainnet RPC if the public endpoint rate-limits requests. Keep authenticated endpoints private.
 
 Current local validation: **21 Rust checks** (3 unit + 18 runtime) and **73 JavaScript tests**. Five runtime checks execute unchanged signed version-0 messages from the shared browser assembly code against the captured real PumpSwap program. See `protocol/BROWSER_VALIDATION.md` for runtime evidence and limits, and `docs/WALLET_VALIDATION.md` for the newer wallet-session checks. See `protocol/VALIDATION.md` for recorded results, provenance, and limitations; recorded checks are not an audit.
 
@@ -57,7 +57,7 @@ See `docs/GUARDED_TRADING.md` for the disabled browser integration, validation s
 
 ## License and attribution
 
-Apache-2.0. Includes Pump Hooks source adapted from https://github.com/Pumphooks/pumphooks at commit `b7fc9f008ebd474b29a770ec7c4d434df84eff2d`. See `LICENSE`, `NOTICE` and `protocol/NOTICE`. SENRO is not affiliated with Pump.fun or endorsed by Pump Hooks.
+Apache-2.0. Includes Pump Hooks source adapted from https://github.com/Nush/nush at commit `b7fc9f008ebd474b29a770ec7c4d434df84eff2d`. See `LICENSE`, `NOTICE` and `protocol/NOTICE`. Nush is not affiliated with Pump.fun or endorsed by Pump Hooks.
 
 For owner-controlled signing setup and read-only rent estimates, see `docs/DEPLOYMENT_PREFLIGHT.md`.
 

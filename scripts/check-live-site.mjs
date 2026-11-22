@@ -13,7 +13,7 @@ export async function checkLiveSite(value,{fetcher=fetch,report=console.log}={})
   assert.match(response.headers.get('content-type')||'',type,path+' has the wrong content type');
   const bytes=new Uint8Array(await response.arrayBuffer());assert.ok(bytes.length,path+' is empty');return bytes;
  }
- const html=new TextDecoder().decode(await asset('/',/text\/html/));assert.match(html,/SENRO/);assert.match(html,/rel="icon"/,'SENRO favicon link missing');
+ const html=new TextDecoder().decode(await asset('/',/text\/html/));assert.match(html,/Nush/);assert.match(html,/rel="icon"/,'Nush favicon link missing');
  const bundles=[...html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g)].map(m=>m[1]);
  assert.ok(bundles.some(p=>p.endsWith('.js'))&&bundles.some(p=>p.endsWith('.css')),'Homepage must reference application JS and CSS');
  const [svg,manifest]=await Promise.all([
@@ -24,7 +24,7 @@ export async function checkLiveSite(value,{fetcher=fetch,report=console.log}={})
   ...bundles.map(p=>asset(p,p.endsWith('.css')?/text\/css/:/(?:text|application)\/javascript/)),
  ]);
  assert.match(new TextDecoder().decode(svg),/<svg\b/);
- const app=JSON.parse(new TextDecoder().decode(manifest));assert.match(app.name||app.short_name||'',/SENRO/i);assert.ok(app.icons?.some(i=>i.sizes==='192x192')&&app.icons?.some(i=>i.sizes==='512x512'),'Manifest app icons missing');
+ const app=JSON.parse(new TextDecoder().decode(manifest));assert.match(app.name||app.short_name||'',/Nush/i);assert.ok(app.icons?.some(i=>i.sizes==='192x192')&&app.icons?.some(i=>i.sizes==='512x512'),'Manifest app icons missing');
  report('PASS app, bundles and app icons');
  const bytes=await asset('/engine/senro_browser_guard.wasm',/application\/wasm/);
  const {instance}=await WebAssembly.instantiate(bytes,{});

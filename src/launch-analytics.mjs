@@ -4,7 +4,7 @@
 // in the curve. Per creator: the Pump creator fee vault balance. That vault is shared by every Pump coin the
 // wallet created, so it is shown once, not per launch, and it is not split between launches.
 //
-// Every number is derived from on-chain accounts decoded by the installed Pump SDK. SENRO takes no fee and
+// Every number is derived from on-chain accounts decoded by the installed Pump SDK. Nush takes no fee and
 // no fee split is assumed here.
 import {PublicKey} from '@solana/web3.js';
 import {loadPumpSdk} from './pump-sdk.mjs';

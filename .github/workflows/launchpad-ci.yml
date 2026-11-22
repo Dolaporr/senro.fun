@@ -1,4 +1,4 @@
-name: Pumphooks launchpad verification
+name: Nush launchpad verification
 on:
   push:
     branches: [feature/solana-launchpad-mvp]

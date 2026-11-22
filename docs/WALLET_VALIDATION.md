@@ -35,7 +35,7 @@ The ChatGPT Site and Netlify deployment are separate. Updating one does not esta
 
 ## Wallet panel and icon refinement
 
-The connection panel is a right-aligned glass dialog with a separate read-only address form. Installed providers are detected through the existing Wallet Standard registry; their own inline data-image logos are displayed with a monogram fallback. No uninstalled provider is presented as a working connection. SENRO uses an original SVG icon family for navigation, rules, balances, network settings and wallet connection.
+The connection panel is a right-aligned glass dialog with a separate read-only address form. Installed providers are detected through the existing Wallet Standard registry; their own inline data-image logos are displayed with a monogram fallback. No uninstalled provider is presented as a working connection. Nush uses an original SVG icon family for navigation, rules, balances, network settings and wallet connection.
 
 Browser QA checked opening the panel, focus placement, expanding read-only access, the disabled empty-submit state and rejection of invalid addresses. Actual provider logo rendering, connection and signing in a real extension still require the user's browser. The 70 regression tests and production build pass; trading remains disabled.
 
@@ -43,7 +43,7 @@ Browser QA checked opening the panel, focus placement, expanding read-only acces
 
 The iPhone browser test exposed a missing entry path: installed wallet apps are not enumerated by Wallet Standard in an ordinary phone browser. The connection panel now offers explicit **Open in Phantom** and **Open in Solflare** links when no in-browser provider is registered. They use the wallets' documented universal browse links, with locally hosted brand assets and preserved license notices.
 
-The wallet opens SENRO at `?connectWallet=1#studio`. The hint opens the connection panel and is removed from browser history; it never automatically calls connect, signs, or treats a URL as proof of an account. Existing Wallet Standard connection/session validation remains unchanged. The target keeps the same app origin and path but strips arbitrary query strings, hashes, RPC credentials and addresses. No attempt is made to infer which apps are installed. The app must still be approved in the wallet browser.
+The wallet opens Nush at `?connectWallet=1#studio`. The hint opens the connection panel and is removed from browser history; it never automatically calls connect, signs, or treats a URL as proof of an account. Existing Wallet Standard connection/session validation remains unchanged. The target keeps the same app origin and path but strips arbitrary query strings, hashes, RPC credentials and addresses. No attempt is made to infer which apps are installed. The app must still be approved in the wallet browser.
 
 Another-wallet help provides a copyable link and manual Browser/Discover instructions. If clipboard permission is unavailable, the UI shows manual-copy guidance. Drafts and named rule sets are browser-local and are not silently transferred. The panel says to review limits again after switching browsers.
 

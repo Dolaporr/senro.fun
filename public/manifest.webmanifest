@@ -1,12 +1,12 @@
 {
-  "name": "SENRO \u2014 Rule Studio",
-  "short_name": "SENRO",
-  "description": "Build and test your Solana trade limits.",
+  "name": "Nush",
+  "short_name": "Nush",
+  "description": "Launch Solana tokens on Pump. See the exact transaction and cost before you sign.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#11101c",
-  "theme_color": "#11101c",
+  "background_color": "#030503",
+  "theme_color": "#030503",
   "icons": [
     {
       "src": "/icons/icon-192.png",

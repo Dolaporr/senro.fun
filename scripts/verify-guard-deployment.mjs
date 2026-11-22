@@ -33,7 +33,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const args=process.argv.slice(2),opts={};
   for(let i=0;i<args.length;i+=2){if(!['--manifest','--artifact'].includes(args[i])||!args[i+1]||opts[args[i]])throw Error('Usage: node scripts/verify-guard-deployment.mjs --manifest REVIEWED_PUBLIC_JSON --artifact FINAL_SO');opts[args[i]]=args[i+1];}
   if(!opts['--manifest']||!opts['--artifact'])throw Error('Provide --manifest and --artifact.');
-  const rpc=new URL(process.env.SENRO_RPC_URL||'https://api.mainnet-beta.solana.com');
+  const rpc=new URL(process.env.Nush_RPC_URL||'https://api.mainnet-beta.solana.com');
   if(rpc.protocol!=='https:'||rpc.username||rpc.password||rpc.hash)throw Error('Provide an HTTPS RPC without basic credentials or a fragment.');
   const report=await verifyGuardRelease({manifest:JSON.parse(await readFile(opts['--manifest'],'utf8')),artifact:await readFile(opts['--artifact']),connection:new Connection(rpc.href,{commitment:'confirmed',disableRetryOnRateLimit:true})});
   console.log(JSON.stringify(report,null,2));

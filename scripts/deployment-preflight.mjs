@@ -34,6 +34,6 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   for(let i=0;i<args.length;i++){const a=args[i];if(a==='--reference'){o.reference=true;continue;}const names={'--wallet':'wallet','--artifact':'artifact','--allocation-bytes':'allocationBytes'};if(!names[a]||!args[i+1])throw Error('Usage: node scripts/deployment-preflight.mjs --wallet PUBLIC_ADDRESS --artifact PATH [--allocation-bytes BYTES] [--reference]');o[names[a]]=args[++i];}
   if(!o.wallet||!o.artifact)throw Error('Provide --wallet and --artifact.');
   if(o.allocationBytes!==undefined)o.allocationBytes=Number(o.allocationBytes);
-  console.log(JSON.stringify(await preflight({...o,rpcUrl:process.env.SENRO_RPC_URL??'https://api.mainnet-beta.solana.com'}),null,2));
+  console.log(JSON.stringify(await preflight({...o,rpcUrl:process.env.Nush_RPC_URL??'https://api.mainnet-beta.solana.com'}),null,2));
  }catch(e){console.error(e instanceof Error?e.message:'Preflight failed');process.exitCode=1;}
 }

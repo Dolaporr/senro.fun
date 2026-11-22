@@ -1,6 +1,6 @@
 # Wallet brand assets
 
-Brand marks identify their respective wallets; SENRO is independent.
+Brand marks identify their respective wallets; Nush is independent.
 
 ## Phantom wallet icon
 

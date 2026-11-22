@@ -34,10 +34,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true', help='Verify local fixtures without network access')
     args = parser.parse_args()
-    endpoint = os.environ.get('SENRO_RPC_URL', 'https://api.mainnet-beta.solana.com')
+    endpoint = os.environ.get('Nush_RPC_URL', 'https://api.mainnet-beta.solana.com')
     url = urllib.parse.urlsplit(endpoint)
     if url.scheme != 'https' or not url.hostname or url.username or url.password or url.fragment:
-        raise ValueError('SENRO_RPC_URL must be HTTPS without basic credentials or fragments')
+        raise ValueError('Nush_RPC_URL must be HTTPS without basic credentials or fragments')
 
     def rpc(method, params):
         body = json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': method, 'params': params}).encode()

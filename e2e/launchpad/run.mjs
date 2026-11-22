@@ -2,7 +2,7 @@ import puppeteer from 'puppeteer-core';
 import {serve} from './server.mjs';
 import path from 'node:path';import os from 'node:os';
 const root=new URL('../../',import.meta.url).pathname;
-const preview=await serve(path.join(root,'dist'),4180),live=await serve(process.env.LIVE_DIST??path.join(os.tmpdir(),'senro-dist-live'),4181);
+const preview=await serve(path.join(root,'dist'),4180),live=await serve(process.env.LIVE_DIST??path.join(os.tmpdir(),'nush-dist-live'),4181);
 const browser=await puppeteer.launch({executablePath:process.env.CHROME??'/usr/bin/google-chrome',headless:'new',args:['--no-sandbox','--disable-gpu']});
 const problems=[];
 const text=p=>p.evaluate(()=>document.body.innerText);
@@ -49,18 +49,20 @@ await p.close();
 p=await open(4181);await fill(p);await connect(p);
 await click(p,'Review launch');await waitText(p,'Approve and sign');
 await p.screenshot({path:path.join(os.tmpdir(),'s4-review-live.png')});
+const reviewText=await text(p);
+console.log('FEES in review:',reviewText.includes('Nush launch fee')&&reviewText.includes('0.01 SOL')&&reviewText.includes('Nush 25%'));
 await click(p,'Approve and sign');await waitText(p,'Your token is live.',30000);
 await p.screenshot({path:path.join(os.tmpdir(),'s5-launched.png')});
 const st=await api(4181,'x');
-console.log('LIVE success: wallet calls',await p.evaluate(()=>window.__walletCalls),'sent',st.sent,'uploads',st.uploads,'pending stored',await p.evaluate(()=>!!sessionStorage.getItem('senro-pending-launch')));
+console.log('LIVE success: lookups',st.lookups,'wallet calls',await p.evaluate(()=>window.__walletCalls),'sent',st.sent,'uploads',st.uploads,'pending stored',await p.evaluate(()=>!!sessionStorage.getItem('nush-pending-launch')));
 // 2b registry: the confirmed launch is listed, survives a reload, reconciles, and deep-links into the studio
 await p.keyboard.press('Escape');
 await p.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Close'))?.click());
 await waitText(p,'Your launches');
 const listed=await text(p);
 console.log('REGISTRY listed:',listed.includes('Mossback')&&listed.includes('Live on Pump'));
-const stored=await p.evaluate(()=>JSON.parse(localStorage.getItem('senro-launches-v1')));
-console.log('REGISTRY stored records:',stored.records.length,'slot',stored.records[0].slot,'pending cleared',await p.evaluate(()=>!sessionStorage.getItem('senro-pending-launch')));
+const stored=await p.evaluate(()=>JSON.parse(localStorage.getItem('nush-launches-v1')));
+console.log('REGISTRY stored records:',stored.records.length,'slot',stored.records[0].slot,'pending cleared',await p.evaluate(()=>!sessionStorage.getItem('nush-pending-launch')));
 await p.reload({waitUntil:'networkidle2'});await waitText(p,'Your launches');
 console.log('REGISTRY survives reload:',(await text(p)).includes('Mossback'));
 await click(p,'Check all on-chain');await waitText(p,'Live on Pump');
@@ -133,6 +135,14 @@ const overflow=await p.evaluate(()=>document.documentElement.scrollWidth>innerWi
 console.log('mobile horizontal overflow:',overflow);
 await p.close();
 
+// setup page renders and refuses a wallet that cannot send by itself
+p=await browser.newPage();await p.setViewport({width:1280,height:900});
+await p.goto('http://localhost:4181/setup.html',{waitUntil:'networkidle2'});
+await waitText(p,'One-time setup');
+await p.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Connect Test Wallet'))?.click());
+await waitText(p,'This is not the treasury');
+console.log('SETUP page: blocks a wallet that is not the treasury:',await p.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Create lookup table'))?.disabled===true));
+await p.screenshot({path:path.join(os.tmpdir(),'s12-setup.png'),fullPage:true});await p.close();
 await browser.close();preview.close();live.close();
 console.log('PROBLEMS:',problems.length?problems:'none');
 process.exit(0);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {handleRpc,validateRpcBody} from '../worker/rpc.mjs';
-const request=(body,origin='https://senro.test')=>new Request('https://senro.test/api/solana',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)});
+const request=(body,origin='https://nush.test')=>new Request('https://nush.test/api/solana',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)});
 const rpc=(method,params=[])=>({jsonrpc:'2.0',id:1,method,params});
 test('relay rejects broadcast, arbitrary methods, batching, and cross-origin callers',async()=>{for(const method of ['sendTransaction','sendRawTransaction','requestAirdrop','signTransaction'])assert.equal((await handleRpc(request(rpc(method)))).status,400);assert.equal((await handleRpc(request([rpc('getGenesisHash')]))).status,400);assert.equal((await handleRpc(request(rpc('getGenesisHash'),'https://foreign.test'))).status,403);});
 test('relay only forwards to the fixed mainnet upstream',async()=>{let seen;const response=await handleRpc(request(rpc('getGenesisHash')),async(url,options)=>{seen={url,options};return Response.json({jsonrpc:'2.0',id:1,result:'mainnet'});});assert.equal(seen.url,'https://solana-rpc.publicnode.com');assert.equal(JSON.parse(seen.options.body).method,'getGenesisHash');assert.equal((await response.json()).result,'mainnet');});

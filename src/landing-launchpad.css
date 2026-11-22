@@ -13,3 +13,15 @@
 .landing-header-launch:hover{background:#caff640f;border-color:#caff6499}
 .landing-header-launch:focus-visible{outline:2px solid #caff64;outline-offset:3px}
 @media(max-width:520px){.landing-header-launch{min-height:36px;padding:0 13px;margin-right:0;font-size:12px}.topbar:has(.landing-header-launch) .landing-header-cta{display:none}}
+
+/* Hero ambient layer: replaces the swaying-grass film with slow light and a few rising motes. */
+.nature-ambient{overflow:hidden}
+.nature-ambient .ambient-light{position:absolute;inset:-10%;background:radial-gradient(38% 30% at 30% 40%,#caff6414,transparent 70%),radial-gradient(30% 26% at 70% 60%,#e8f5d40d,transparent 70%);mix-blend-mode:screen;animation:nush-drift 26s ease-in-out infinite alternate}
+.nature-ambient .ambient-motes{position:absolute;inset:0}
+.nature-ambient .ambient-motes i{position:absolute;width:3px;height:3px;border-radius:50%;background:#e6f7c8;box-shadow:0 0 8px #caff6466;opacity:0;animation:nush-mote 22s linear infinite}
+.nature-ambient.is-paused .ambient-light,.nature-ambient.is-paused .ambient-motes i{animation-play-state:paused}
+.nature-ambient.is-paused .ambient-motes{display:none}
+@keyframes nush-drift{from{transform:translate3d(-4%,-2%,0)}to{transform:translate3d(5%,3%,0)}}
+@keyframes nush-mote{0%{opacity:0;transform:translate3d(0,0,0)}15%{opacity:.55}80%{opacity:.35}100%{opacity:0;transform:translate3d(14px,-120px,0)}}
+@media(prefers-reduced-motion:reduce){.nature-ambient .ambient-light,.nature-ambient .ambient-motes i{animation:none}.nature-ambient .ambient-motes{display:none}}
+.brand>span:not(.brand-mark){letter-spacing:-.02em;text-transform:none}

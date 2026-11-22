@@ -1,4 +1,4 @@
-# SENRO live-trading rollout
+# Nush live-trading rollout
 
 Status: deployment preparation. Live trading is disabled. There is no production guard identity configured, no deployment signer connected to this environment, and this environment has no Solana CLI, cargo or cargo-build-sbf on PATH. The existing archived guard is a local-test artifact, not a mainnet release.
 
@@ -37,7 +37,7 @@ Run locally after deployment:
 node scripts/verify-guard-deployment.mjs --manifest reviewed-public-release.json --artifact protocol/target/deploy/senro_guard.so
 ```
 
-For a private RPC endpoint, set `SENRO_RPC_URL` privately in the local environment. Never commit the URL/key. The report deliberately leaves `candidate.enabled` false. Its full allocation hash may differ from `artifactSha256` if the deployment includes zero padding; this distinction is required by the existing browser verifier.
+For a private RPC endpoint, set `Nush_RPC_URL` privately in the local environment. Never commit the URL/key. The report deliberately leaves `candidate.enabled` false. Its full allocation hash may differ from `artifactSha256` if the deployment includes zero padding; this distinction is required by the existing browser verifier.
 
 ## Additional on-chain work required for all four rules
 

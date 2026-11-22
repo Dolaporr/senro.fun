@@ -6,7 +6,7 @@ export const MOBILE_WALLETS=Object.freeze([
 export function mobileWalletTarget(value,{hash='studio'}={}){
  const current=new URL(value);
  const local=current.protocol==='http:'&&['localhost','127.0.0.1','terminal.local'].includes(current.hostname);
- if(current.protocol!=='https:'&&!local||current.username||current.password)throw Error('Open SENRO over HTTPS to use a mobile wallet.');
+ if(current.protocol!=='https:'&&!local||current.username||current.password)throw Error('Open Nush over HTTPS to use a mobile wallet.');
  // Never forward RPC credentials, public addresses, arbitrary callbacks or hashes.
  const target=new URL(current.origin);target.pathname=current.pathname;target.searchParams.set('connectWallet','1');if(hash)target.hash=hash;return target;
 }

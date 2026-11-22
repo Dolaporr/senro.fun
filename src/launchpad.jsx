@@ -1,6 +1,7 @@
 import './polyfills.mjs';
 import React,{useState,useEffect,useRef,useMemo} from 'react';
 import {createRoot} from 'react-dom/client';
+import {NushMark} from './nush-brand.jsx';
 import {ArrowUpRight,Check,ImagePlus,Info,ExternalLink} from 'lucide-react';
 import {getWallets} from '@wallet-standard/app';
 import {validateLaunch} from './launchpad-model.mjs';
@@ -8,12 +9,17 @@ import {createLaunchFlow,DISABLED_REASON} from './launchpad-flow.mjs';
 import {createLaunchConnection,uploadLaunchMetadata} from './launch-client.mjs';
 import {MOBILE_WALLETS,walletBrowseLink,isMobileBrowser,consumeWalletHandoff} from './mobile-wallet.mjs';
 import {readCreatorAnalytics,formatSol} from './launch-analytics.mjs';
+import {readEconomicsConfig,LAUNCH_FEE_LAMPORTS,TREASURY_SHARE_BPS,CREATOR_SHARE_BPS} from './nush-economics.mjs';
 import {loadRegistry,saveRegistry,reconcileLaunches,studioLink} from './launch-registry.mjs';
 import './launchpad.css';
 
 // Live launches stay off unless the deployment is built with VITE_LAUNCH_ENABLED=true.
 const LAUNCH_ENABLED=import.meta.env?.VITE_LAUNCH_ENABLED==='true';
-const PENDING_KEY='senro-pending-launch';
+// Fees are public settings, built into the page and enforced again by the launch relay.
+let ECONOMICS=null,ECONOMICS_ERROR='';
+try{ECONOMICS=readEconomicsConfig({treasury:import.meta.env?.VITE_NUSH_TREASURY,lookupTable:import.meta.env?.VITE_NUSH_LOOKUP_TABLE});}catch(e){ECONOMICS_ERROR=e.message;}
+const FEE_LINE=`${LAUNCH_FEE_LAMPORTS/1e9} SOL per launch, and ${TREASURY_SHARE_BPS/100}% of the coin's creator fees`;
+const PENDING_KEY='nush-pending-launch';
 const initial={name:'',symbol:'',description:'',website:'',twitter:'',telegram:'',image:null};
 const short=(a,n=4)=>a?`${a.slice(0,n)}…${a.slice(-n)}`:'';
 const sol=l=>l==null?'Not available':`${(l/1e9).toFixed(l<1e6?6:4)} SOL`;
@@ -39,7 +45,7 @@ function LaunchStats({s}){
 
 function LaunchArt({record}){const [failed,setFailed]=useState(false);return <span className="lp-launch-art">{record.imageUri&&!failed?<img src={record.imageUri} alt="" loading="lazy" width="44" height="44" onError={()=>setFailed(true)}/>:<span>{record.symbol.slice(0,2)}</span>}</span>}
 
-function Mark(){return <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M23 9H12a4 4 0 0 0 0 8h8a4 4 0 0 1 0 8H9" stroke="currentColor" strokeWidth="4" strokeLinecap="square"/></svg>}
+function Mark(){return <NushMark/>}
 
 function Steps({stage,lastIndex,compact}){
  let [index,failed]=POSITION[stage]??(stage==='error'?[lastIndex,true]:[-1]);
@@ -69,7 +75,7 @@ function App(){
  useEffect(()=>{
   flowRef.current?.cancel();
   if(!connected){flowRef.current=null;setFlowState({stage:'idle'});return;}
-  const flow=createLaunchFlow({enabled:LAUNCH_ENABLED,connection,wallet:connected.wallet,account:connected.account,upload:args=>uploadLaunchMetadata(args),persist:rec=>{try{sessionStorage.setItem(PENDING_KEY,JSON.stringify(rec));}catch{}setPending(rec);},onLaunched:rec=>{registry.ingest(rec);syncLaunches();try{sessionStorage.removeItem(PENDING_KEY);}catch{}setPending(null);}});
+  const flow=createLaunchFlow({enabled:LAUNCH_ENABLED,economics:ECONOMICS,requireEconomics:true,connection,wallet:connected.wallet,account:connected.account,upload:args=>uploadLaunchMetadata(args),persist:rec=>{try{sessionStorage.setItem(PENDING_KEY,JSON.stringify(rec));}catch{}setPending(rec);},onLaunched:rec=>{registry.ingest(rec);syncLaunches();try{sessionStorage.removeItem(PENDING_KEY);}catch{}setPending(null);}});
   flowRef.current=flow;setFlowState(flow.state);
   const off=flow.subscribe(setFlowState);
   return()=>{off();flow.cancel();};
@@ -85,7 +91,7 @@ function App(){
 
  return <>
   <header className="lp-nav">
-   <a className="lp-brand" href="/" aria-label="SENRO home"><Mark/>SENRO</a>
+   <a className="lp-brand" href="/" aria-label="Nush home"><Mark/>nush</a>
    <nav className="lp-links" aria-label="Primary"><a href="/">Overview</a><a href="/launchpad.html" aria-current="page">Launch</a></nav>
    <button className="lp-wallet" data-on={!!connected} onClick={()=>connected?setConnected(null):setPicker(true)}><i/>{connected?<code>{short(account)}</code>:'Connect wallet'}</button>
   </header>
@@ -125,7 +131,7 @@ function App(){
     {launches.length>0&&<section className="lp-section lp-launches" aria-label="Your launches">
      <h2>Your launches<small>kept in this browser</small></h2>
      {connected&&mine.length>0&&<div className="lp-creator">
-      <div><span>Creator fees waiting in your Pump vault</span><strong>{stats?formatSol(stats.claimableLamports):statsBusy?'Reading…':'Not read yet'}</strong><small>Shared across every Pump coin this wallet created. Claim them on Pump; SENRO takes no share.</small></div>
+      <div><span>Creator fees waiting in your Pump vault</span><strong>{stats?formatSol(stats.claimableLamports):statsBusy?'Reading…':'Not read yet'}</strong><small>Coins launched on Nush pay creator fees through Pump fee sharing instead: claim your 75% on Pump. This vault holds fees from other Pump coins. Shared across every Pump coin this wallet created. Claim them on Pump; Nush takes no share.</small></div>
       <button className="lp-ghost" disabled={statsBusy} onClick={loadStats}>{statsBusy?'Reading…':'Refresh numbers'}</button>
       {statsError&&<span className="lp-err">{statsError}</span>}
      </div>}
@@ -135,7 +141,7 @@ function App(){
       <span className="lp-launch-state" data-state={r.state}>{STATE_LABEL[r.state]}</span>
       <span className="lp-launch-actions"><a href={`https://solscan.io/token/${r.mint}`} target="_blank" rel="noreferrer">Solscan</a><a href={studioLink(r.mint)}>Simulate a buy</a><button disabled={checking} onClick={()=>checkLaunches([r.mint])}>Check</button></span>
      </li>)}</ul>
-     <p className="lp-rules-note">Want limits on your own buys? Set rules in the <a href="/#studio">SENRO studio</a>. They apply only to buys you make through SENRO. Anyone can still trade your token directly on Pump.</p>
+     <p className="lp-rules-note">Want limits on your own buys? Set rules in the <a href="/#studio">Nush studio</a>. They apply only to buys you make through Nush. Anyone can still trade your token directly on Pump.</p>
      <div className="lp-launch-foot">{launches.length>shown&&<button className="lp-ghost" onClick={()=>setShown(n=>n+8)}>Show more</button>}<button className="lp-ghost" disabled={checking} onClick={()=>checkLaunches(null)}>{checking?'Checking…':'Check all on-chain'}</button>{checkNote&&<span className="lp-err">{checkNote}</span>}</div>
     </section>}
     {pending&&<div className="lp-note lp-pending"><Info size={16}/><span>A launch from this session is still unresolved: <code>{short(pending.signature,8)}</code> <a href={`https://solscan.io/tx/${pending.signature}`} target="_blank" rel="noreferrer">View on Solscan <ExternalLink size={11}/></a><button onClick={checkPending}>Check status</button>{pendingNote&&<><br/>{pendingNote}</>}</span></div>}
@@ -150,6 +156,7 @@ function App(){
       <dl className="lp-facts">
        <div><dt>Network</dt><dd>Solana mainnet</dd></div>
        <div><dt>Venue</dt><dd>Pump</dd></div>
+       <div><dt>Nush fees</dt><dd>{FEE_LINE}</dd></div>
        <div><dt>Creator</dt><dd>{connected?<code>{short(account)}</code>:'Not connected'}</dd></div>
        <div><dt>Status</dt><dd>{stage==='launched'?'Launched':'Not launched'}</dd></div>
       </dl>
@@ -169,6 +176,9 @@ function App(){
     <div><dt>Metadata</dt><dd><a href={review.metadataUri} target="_blank" rel="noreferrer">Verified on IPFS <ExternalLink size={11}/></a></dd></div>
     <div><dt>SOL leaving your wallet</dt><dd>{sol(review.creatorDebitLamports)}</dd></div>
     <div><dt>Network fee</dt><dd>{sol(review.feeLamports)}</dd></div>
+    {review.fees&&<div><dt>Nush launch fee</dt><dd>{review.fees.launchFeeLamports/1e9} SOL</dd></div>}
+    {review.fees&&<div><dt>Creator fee split</dt><dd>You {CREATOR_SHARE_BPS/100}%, Nush {review.fees.treasuryShareBps/100}%, set for good</dd></div>}
+    {review.fees&&<div><dt>Nush treasury</dt><dd><a href={`https://solscan.io/account/${review.fees.treasury}`} target="_blank" rel="noreferrer"><code>{short(review.fees.treasury,5)}</code> <ExternalLink size={11}/></a></dd></div>}
     <div><dt>Initial buy</dt><dd>None</dd></div>
    </dl>}
    <Steps stage={stage} lastIndex={lastIndex.current} compact/>
@@ -193,7 +203,7 @@ function App(){
    {walletError&&<div className="lp-note" data-tone="bad"><Info size={16}/><span>{walletError}</span></div>}
   </section></div>}
 
-  <footer className="lp-footer"><span>SENRO on Solana, Pump launches</span><span>{LAUNCH_ENABLED?'Live launches enabled':'Preview release. No live launches.'}</span></footer>
+  <footer className="lp-footer"><span>Nush on Solana, Pump launches</span><span>{LAUNCH_ENABLED?'Live launches enabled':'Preview release. No live launches.'}</span></footer>
  </>;
 }
 createRoot(document.getElementById('launchpad-root')).render(<App/>);
