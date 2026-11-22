@@ -10,21 +10,9 @@
 import {AddressLookupTableAccount,Keypair,PublicKey,SystemProgram} from '@solana/web3.js';
 import {loadPumpSdk} from './pump-sdk.mjs';
 
-export const LAUNCH_FEE_LAMPORTS=10_000_000; // 0.01 SOL
-export const TREASURY_SHARE_BPS=2_500; // 25%
-export const CREATOR_SHARE_BPS=10_000-TREASURY_SHARE_BPS; // 75%
-const BASE58=/^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-
-/** Validates deployment config. Returns null when nothing is configured, throws when it is half-configured. */
-export function readEconomicsConfig({treasury,lookupTable}={}){
- const t=String(treasury??'').trim(),l=String(lookupTable??'').trim();
- if(!t&&!l)return null;
- if(!BASE58.test(t))throw Error('The Nush treasury address is missing or invalid.');
- if(!BASE58.test(l))throw Error('The Nush lookup table address is missing or invalid.');
- new PublicKey(t);new PublicKey(l);
- if(t===l)throw Error('Treasury and lookup table must differ.');
- return Object.freeze({treasury:t,lookupTable:l,launchFeeLamports:LAUNCH_FEE_LAMPORTS,treasuryShareBps:TREASURY_SHARE_BPS});
-}
+// Fee constants and config parsing live in a dependency-free module the server functions can import.
+export {LAUNCH_FEE_LAMPORTS,TREASURY_SHARE_BPS,CREATOR_SHARE_BPS,readEconomicsConfig} from './nush-config.mjs';
+import {LAUNCH_FEE_LAMPORTS,TREASURY_SHARE_BPS,CREATOR_SHARE_BPS} from './nush-config.mjs';
 
 /** The fee instructions that follow create_v2: create the sharing config, split 75/25, pay the launch fee. */
 export async function economicsInstructions({creator,mint,economics}){

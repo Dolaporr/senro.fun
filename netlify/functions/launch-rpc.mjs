@@ -2,7 +2,7 @@
 // VITE_NUSH_TREASURY and VITE_NUSH_LOOKUP_TABLE are set).
 // LAUNCH_RPC_URL (optional, server-side only) is a private mainnet RPC used before the public fallbacks.
 import {handleLaunchRpc,createLaunchLimiters,launchUpstreams} from '../../worker/launch-rpc.mjs';
-import {readEconomicsConfig} from '../../src/nush-economics.mjs';
+import {readEconomicsConfig} from '../../src/nush-config.mjs';
 const limiters=createLaunchLimiters();
 // The same public settings the page is built with: the relay enforces the fees the page shows.
 let upstreams,economics=null,configError=null;

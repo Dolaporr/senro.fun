@@ -5,7 +5,10 @@
 // a Pump create_v2 launch: v0, two signers, no lookup tables, optional ComputeBudget limit/price,
 // and exactly one Pump-program instruction carrying the create_v2 discriminator. Sends additionally
 // require both signatures to verify. It cannot be used to send an arbitrary transaction.
-import {PublicKey,VersionedTransaction} from '@solana/web3.js';
+// No npm packages here: Netlify's function bundle cannot load web3.js's dependencies (see
+// tests/netlify-function-deps.test.mjs). Transactions are read with the small parser in tx-wire.mjs.
+import {parseTransaction} from './tx-wire.mjs';
+import {base58Encode} from '../src/nush-config.mjs';
 
 export const PUMP_PROGRAM_ID='6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
 export const COMPUTE_BUDGET_ID='ComputeBudget111111111111111111111111111111';
@@ -52,7 +55,7 @@ export const UPDATE_FEE_SHARES_DISCRIMINATOR=[189,13,136,99,187,164,237,35];
 const startsWith=(data,prefix)=>prefix.every((v,i)=>data[i]===v);
 const u16=(d,o)=>d[o]|d[o+1]<<8,u32=(d,o)=>(d[o]|d[o+1]<<8|d[o+2]<<16)+d[o+3]*2**24;
 const u64=(d,o)=>Number(d.slice(o,o+8).reduceRight((n,b)=>n*256n+BigInt(b),0n));
-const keyAt=(d,o)=>new PublicKey(d.slice(o,o+32)).toBase58();
+const keyAt=(d,o)=>base58Encode(d.slice(o,o+32));
 
 /**
  * Throws unless `base64` is a Nush launch. Without economics: compute budget + exactly one Pump create_v2,
@@ -64,14 +67,14 @@ export function inspectLaunchWire(base64,economics=null){
  if(typeof base64!=='string'||base64.length>1700)throw Error('Invalid transaction size.');
  let bytes;try{bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0));}catch{throw Error('Invalid base64 transaction.');}
  if(bytes.length>1232||bytes.length<130)throw Error('Invalid transaction size.');
- let tx;try{tx=VersionedTransaction.deserialize(bytes);}catch{throw Error('Invalid transaction.');}
- const m=tx.message,keys=m.staticAccountKeys;
+ let tx;try{tx=parseTransaction(bytes);}catch{throw Error('Invalid transaction.');}
+ const m=tx,keys=m.staticAccountKeys;
  if(tx.version!==0)throw Error('Only v0 transactions are allowed.');
  if(economics){
-  if(m.addressTableLookups.length!==1||m.addressTableLookups[0].accountKey.toBase58()!==economics.lookupTable)throw Error('A Nush launch uses only the Nush lookup table.');
+  if(m.addressTableLookups.length!==1||m.addressTableLookups[0].accountKey!==economics.lookupTable)throw Error('A Nush launch uses only the Nush lookup table.');
  }else if(m.addressTableLookups.length)throw Error('Only v0 transactions without lookup tables are allowed.');
  if(m.header.numRequiredSignatures!==2||tx.signatures.length!==2)throw Error('A launch has exactly two signers.');
- const program=ix=>{if(ix.programIdIndex>=keys.length)throw Error('Program ids must be listed directly.');return keys[ix.programIdIndex].toBase58();};
+ const program=ix=>{if(ix.programIdIndex>=keys.length)throw Error('Program ids must be listed directly.');return keys[ix.programIdIndex];};
  const ixs=m.compiledInstructions;let i=0;
  while(i<ixs.length&&program(ixs[i])===COMPUTE_BUDGET_ID){if(![2,3].includes(ixs[i].data[0]))throw Error('Only compute limit and price instructions are allowed.');i++;}
  if(i>2)throw Error('At most two compute budget instructions are allowed.');
@@ -93,22 +96,22 @@ export function inspectLaunchWire(base64,economics=null){
  const [config,update,transfer]=rest.slice(1);
  if(program(config)!==PUMP_FEE_PROGRAM_ID||!startsWith(config.data,CREATE_FEE_SHARING_DISCRIMINATOR))throw Error('The Pump fee-sharing config must follow the create.');
  if(program(update)!==PUMP_FEE_PROGRAM_ID||!startsWith(update.data,UPDATE_FEE_SHARES_DISCRIMINATOR))throw Error('The Pump fee split must follow the config.');
- const d=update.data,creator=keys[0].toBase58();
+ const d=update.data,creator=keys[0];
  if(d.length!==12+34*2||u32(d,8)!==2)throw Error('The fee split must have exactly two shareholders.');
  const shares=[[keyAt(d,12),u16(d,44)],[keyAt(d,46),u16(d,78)]];
  if(shares[0][0]!==creator||shares[0][1]!==10_000-economics.treasuryShareBps||shares[1][0]!==economics.treasury||shares[1][1]!==economics.treasuryShareBps)throw Error('The fee split must be the creator and the Nush treasury at the agreed shares.');
  if(program(transfer)!==SYSTEM_PROGRAM_ID||transfer.data.length!==12||u32(transfer.data,0)!==2)throw Error('The launch fee must be a plain SOL transfer.');
  const [from,to]=transfer.accountKeyIndexes;
- if(transfer.accountKeyIndexes.length!==2||from!==0||to>=keys.length||keys[to].toBase58()!==economics.treasury)throw Error('The launch fee must go from the creator to the Nush treasury.');
+ if(transfer.accountKeyIndexes.length!==2||from!==0||to>=keys.length||keys[to]!==economics.treasury)throw Error('The launch fee must go from the creator to the Nush treasury.');
  if(u64(transfer.data,4)!==economics.launchFeeLamports)throw Error('The launch fee amount is wrong.');
  return tx;
 }
 
 async function signaturesValid(tx){
- const message=tx.message.serialize();
+ const message=tx.messageBytes;
  for(let i=0;i<2;i++){
   const sig=tx.signatures[i];if(sig.length!==64||sig.every(b=>b===0))return false;
-  const key=await crypto.subtle.importKey('raw',tx.message.staticAccountKeys[i].toBytes(),{name:'Ed25519'},false,['verify']);
+  const key=await crypto.subtle.importKey('raw',tx.keyBytes[i],{name:'Ed25519'},false,['verify']);
   if(!await crypto.subtle.verify('Ed25519',key,sig,message))return false;
  }
  return true;
