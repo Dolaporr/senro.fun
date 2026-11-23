@@ -1,15 +1,9 @@
 name: Nush launchpad verification
 on:
   push:
-    branches: [feature/solana-launchpad-mvp]
+    branches: [main, feature/solana-launchpad-mvp]
+  # Every pull request: server functions, the relay and the fee code live outside the launchpad paths.
   pull_request:
-    paths:
-      - 'src/launchpad*'
-      - 'tests/launchpad*'
-      - 'vite.config.js'
-      - 'launchpad.html'
-      - 'package*.json'
-      - '.github/workflows/launchpad-ci.yml'
 jobs:
   launchpad:
     runs-on: ubuntu-latest
