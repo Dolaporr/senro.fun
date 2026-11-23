@@ -76,3 +76,29 @@ test('the HTTP relay passes economics through: a cheap launch never reaches an u
  assert.equal((await handleLaunchRpc(post(sim(cheap)),fetcher,{economics})).status,400);
  assert.equal(calls,1);
 });
+
+test('server settings: treasury without table is setup mode (reads work, launches paused); bad RPC URL is fatal and named',async()=>{
+ const {launchServerConfig}=await import('../worker/launch-rpc.mjs');
+ const T=economics.treasury,L=economics.lookupTable;
+ const setup=launchServerConfig({VITE_NUSH_TREASURY:T});
+ assert.equal(setup.fatal,undefined);assert.match(setup.launchesBlocked,/VITE_NUSH_LOOKUP_TABLE is not set/);
+ const read={jsonrpc:'2.0',id:1,method:'getSlot',params:[]};
+ assert.ok(await validateLaunchRpc(read,setup));
+ for(const m of [sim,send]){const {transaction}=await launch();await assert.rejects(validateLaunchRpc(m(transaction),setup),/setup is finished/);}
+ assert.match(launchServerConfig({VITE_NUSH_LOOKUP_TABLE:L}).launchesBlocked,/VITE_NUSH_TREASURY/);
+ assert.match(launchServerConfig({VITE_NUSH_TREASURY:'bad',VITE_NUSH_LOOKUP_TABLE:L}).launchesBlocked,/treasury/);
+ const full=launchServerConfig({VITE_NUSH_TREASURY:T,VITE_NUSH_LOOKUP_TABLE:L});assert.equal(full.launchesBlocked,null);assert.equal(full.economics.treasury,T);
+ assert.equal(launchServerConfig({}).economics,null);assert.equal(launchServerConfig({}).launchesBlocked,null);
+ assert.match(launchServerConfig({LAUNCH_RPC_URL:'http://x.example'}).fatal,/HTTPS/);
+ assert.ok(!JSON.stringify(launchServerConfig({LAUNCH_RPC_URL:'nope?api-key=SECRET'})).includes('SECRET'));
+});
+
+test('the deployed function in setup mode answers reads instead of failing',async()=>{
+ process.env.VITE_NUSH_TREASURY=economics.treasury;delete process.env.VITE_NUSH_LOOKUP_TABLE;delete process.env.LAUNCH_RPC_URL;
+ const {default:fn}=await import('../netlify/functions/launch-rpc.mjs?setup-mode');
+ const realFetch=globalThis.fetch;globalThis.fetch=async()=>new Response(JSON.stringify({jsonrpc:'2.0',id:1,result:123}));
+ try{
+  const r=await fn(new Request('https://nush.test/api/launch-rpc',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'getSlot',params:[]})}),{ip:'9.9.9.9'});
+  assert.equal(r.status,200);assert.equal((await r.json()).result,123);
+ }finally{globalThis.fetch=realFetch;delete process.env.VITE_NUSH_TREASURY;}
+});

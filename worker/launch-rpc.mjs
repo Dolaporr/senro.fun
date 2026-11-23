@@ -8,7 +8,7 @@
 // No npm packages here: Netlify's function bundle cannot load web3.js's dependencies (see
 // tests/netlify-function-deps.test.mjs). Transactions are read with the small parser in tx-wire.mjs.
 import {parseTransaction} from './tx-wire.mjs';
-import {base58Encode} from '../src/nush-config.mjs';
+import {base58Encode,readEconomicsConfig} from '../src/nush-config.mjs';
 
 export const PUMP_PROGRAM_ID='6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
 export const COMPUTE_BUDGET_ID='ComputeBudget111111111111111111111111111111';
@@ -56,6 +56,21 @@ const startsWith=(data,prefix)=>prefix.every((v,i)=>data[i]===v);
 const u16=(d,o)=>d[o]|d[o+1]<<8,u32=(d,o)=>(d[o]|d[o+1]<<8|d[o+2]<<16)+d[o+3]*2**24;
 const u64=(d,o)=>Number(d.slice(o,o+8).reduceRight((n,b)=>n*256n+BigInt(b),0n));
 const keyAt=(d,o)=>base58Encode(d.slice(o,o+32));
+
+/**
+ * Reads the server settings. A bad LAUNCH_RPC_URL is fatal. Fee settings have three states: none (no fees
+ * enforced), complete (fees enforced), or treasury-only, which is the normal state DURING setup: reads work so
+ * /setup.html can create the lookup table, but launches are refused until the table address is set.
+ */
+export function launchServerConfig(env){
+ let upstreams;
+ try{upstreams=launchUpstreams(env.LAUNCH_RPC_URL);}catch(e){return {fatal:e.message};}
+ const treasury=String(env.VITE_NUSH_TREASURY??'').trim(),table=String(env.VITE_NUSH_LOOKUP_TABLE??'').trim();
+ if(treasury&&!table)return {upstreams,economics:null,launchesBlocked:'Launches are paused until setup is finished: VITE_NUSH_LOOKUP_TABLE is not set yet.'};
+ if(!treasury&&table)return {upstreams,economics:null,launchesBlocked:'Launches are paused: VITE_NUSH_TREASURY is not set.'};
+ try{return {upstreams,economics:readEconomicsConfig({treasury,lookupTable:table}),launchesBlocked:null};}
+ catch(e){return {upstreams,economics:null,launchesBlocked:`Launches are paused: ${e.message}`};}
+}
 
 /**
  * Throws unless `base64` is a Nush launch. Without economics: compute budget + exactly one Pump create_v2,
@@ -118,7 +133,7 @@ async function signaturesValid(tx){
 }
 
 /** Validates one JSON-RPC request; returns it, or throws a user-facing message. */
-export async function validateLaunchRpc(body,{economics=null}={}){
+export async function validateLaunchRpc(body,{economics=null,launchesBlocked=null}={}){
  if(!body||Array.isArray(body)||body.jsonrpc!=='2.0')throw Error('Invalid JSON-RPC request.');
  const params=body.params??[];if(!Array.isArray(params))throw Error('Invalid RPC parameters.');
  if(READ_METHODS.has(body.method)){
@@ -126,6 +141,7 @@ export async function validateLaunchRpc(body,{economics=null}={}){
   if(body.method==='getSignatureStatuses'&&(!Array.isArray(params[0])||params[0].length!==1))throw Error('Check one signature at a time.');
   return body;
  }
+ if(launchesBlocked&&['simulateTransaction','sendTransaction'].includes(body.method))throw Error(launchesBlocked);
  if(body.method==='simulateTransaction'){
   const o=params[1];
   if(o?.encoding!=='base64'||o.sigVerify!==false||o.replaceRecentBlockhash!==false)throw Error('Simulate the exact message: unsigned check, original blockhash.');
@@ -149,12 +165,12 @@ async function readBounded(request){
  const bytes=new Uint8Array(size);let o=0;for(const c of chunks){bytes.set(c,o);o+=c.length;}return new TextDecoder().decode(bytes);
 }
 
-export async function handleLaunchRpc(request,fetcher=fetch,{limiters=null,upstreams=PUBLIC_UPSTREAMS,ip=null,economics=null}={}){
+export async function handleLaunchRpc(request,fetcher=fetch,{limiters=null,upstreams=PUBLIC_UPSTREAMS,ip=null,economics=null,launchesBlocked=null}={}){
  if(request.method!=='POST')return json({error:'Use POST.'},405);
  const origin=request.headers.get('origin');if(origin&&origin!==new URL(request.url).origin)return json({error:'Cross-origin requests are not allowed.'},403);
  if(Number(request.headers.get('content-length'))>MAX_BODY*2)return json({error:'Request too large.'},413);
  let body;
- try{const text=await readBounded(request);body=await validateLaunchRpc(JSON.parse(text),{economics});}
+ try{const text=await readBounded(request);body=await validateLaunchRpc(JSON.parse(text),{economics,launchesBlocked});}
  catch(e){return json({jsonrpc:'2.0',id:null,error:{code:-32600,message:e.message}},e.message==='Request too large.'?413:400);}
  if(limiters&&!limiters[methodClass(body.method)](clientKey(request,ip)))return json({jsonrpc:'2.0',id:body.id??null,error:{code:-32005,message:body.method==='sendTransaction'?'Too many launches from this connection. Wait a few minutes.':'Too many requests. Wait a moment and try again.'}},429);
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),18000);

@@ -24,4 +24,7 @@
 @keyframes nush-drift{from{transform:translate3d(-4%,-2%,0)}to{transform:translate3d(5%,3%,0)}}
 @keyframes nush-mote{0%{opacity:0;transform:translate3d(0,0,0)}15%{opacity:.55}80%{opacity:.35}100%{opacity:0;transform:translate3d(14px,-120px,0)}}
 @media(prefers-reduced-motion:reduce){.nature-ambient .ambient-light,.nature-ambient .ambient-motes i{animation:none}.nature-ambient .ambient-motes{display:none}}
-.brand>span:not(.brand-mark){letter-spacing:-.02em;text-transform:none}
+header.landing-topbar .brand>span:not(.brand-mark){letter-spacing:-.02em;text-transform:none}
+/* Phones: several older sheets set the landing header's padding and the last one zeroed it, so the logo and
+   the Launch button touched the screen edges. This keeps 20px either side. */
+@media(max-width:740px){header.topbar.landing-topbar{padding-left:20px;padding-right:20px;margin-left:0;margin-right:0}}
